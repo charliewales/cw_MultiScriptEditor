@@ -42,7 +42,8 @@ class inputClass(QTextEdit):
         font.setFixedPitch(True)
         self.document().setDefaultFont(QFont(font_name, minimumFontSize, QFont.Monospace))
         metrics = QFontMetrics(self.document().defaultFont())
-        self.setTabStopWidth(4 * metrics.width(' '))
+        self.setTabStopDistance(4 * metrics.horizontalAdvance(' '))  # Use horizontalAdvance instead of width215
+
         self.setAcceptDrops(True)
         self.fs = 12
         self.completer = completeWidget.completeMenuClass(parent, self)
@@ -129,11 +130,22 @@ class inputClass(QTextEdit):
     def moveCompleter(self):
         rec = self.cursorRect()
         pt = self.mapToGlobal(rec.bottomRight())
-        y=x=0
-        if self.completer.isVisible() and self.desk:
-            currentScreen = self.desk.screenGeometry(self.mapToGlobal(rec.bottomRight()))
-            futureCompGeo = self.completer.geometry()
-            futureCompGeo.moveTo(pt)
+        y = x = 0
+
+        if self.completer.isVisible():
+            screens = QGuiApplication.screens()
+            currentScreen = None
+
+            # Find the screen that contains the point
+            for screen in screens:
+                if screen.geometry().contains(pt):
+                    currentScreen = screen
+                    break
+
+            if currentScreen:
+                currentScreenGeometry = currentScreen.geometry()
+                futureCompGeo = self.completer.geometry()
+
             if not currentScreen.contains(futureCompGeo):
                 try:
                     i = currentScreen.intersect(futureCompGeo)
@@ -218,7 +230,7 @@ class inputClass(QTextEdit):
             event.ignore()
             return
         # execute selected
-        elif event.modifiers() == Qt.ControlModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter]:
+        elif ( event.modifiers() == Qt.ControlModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter] ):
             if self.completer:
                 self.completer.updateCompleteList()
             self.executeSignal.emit()

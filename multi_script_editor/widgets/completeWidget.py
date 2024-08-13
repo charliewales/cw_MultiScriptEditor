@@ -55,8 +55,8 @@ class completeMenuClass(QListWidget):
                     self.addItem(item)
 
             font = QFont("monospace", self.lineHeight, False)
-            fm = QFontMetrics (font)
-            width = fm.width(' ') *  max([len(x.name) for x in lines or extra]) + 40
+            fm = QFontMetrics(font)
+            width = fm.horizontalAdvance(' ') * max([len(x.name) for x in lines or extra]) + 40
 
             self.resize(max(250,width), 250)
             self.setCurrentRow(0)
