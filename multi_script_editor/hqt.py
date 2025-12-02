@@ -1239,6 +1239,7 @@ QSpinBox::down-button, QDoubleSpinBox::down-button  {
 
 
 QPlainTextEdit, QTextEdit {
+    font-size: 16px;
     background: #000;
     color: white;
 }
@@ -1274,7 +1275,7 @@ def qss14():
 QWidget
 {
     font-family: "Consolas";
-    font-size: 14px;
+    font-size: 16px;
     color: rgb(@TextColor@);
 	background-color: rgb(@BackColor@);
 }
@@ -1306,6 +1307,7 @@ QStatusBar
 
 QTextEdit, QPlainTextEdit
 {
+    font-size: 16px;
     background: rgb(@TextboxBG@);
     color: rgb(@TextColor@);
     selection-background-color: rgb(@SelectedTextBG@);
@@ -1315,7 +1317,7 @@ QTextEdit, QPlainTextEdit
 QTextEdit#code_edit
 {
     background: rgb(@ButtonGradHi@);
-    font-size: 15px;
+    font-size: 16px;
     border: none;
 }
 

@@ -42,8 +42,7 @@ class inputClass(QTextEdit):
         font.setFixedPitch(True)
         self.document().setDefaultFont(QFont(font_name, minimumFontSize, QFont.Monospace))
         metrics = QFontMetrics(self.document().defaultFont())
-        self.setTabStopDistance(4 * metrics.horizontalAdvance(' '))  # Use horizontalAdvance instead of width215
-
+        self.setTabStopWidth(4 * metrics.width(' '))
         self.setAcceptDrops(True)
         self.fs = 12
         self.completer = completeWidget.completeMenuClass(parent, self)
@@ -117,9 +116,9 @@ class inputClass(QTextEdit):
                             offs = len(autoImp.split('\n'))-1
                         bl = tc.blockNumber() + 1 + offs
                         col = tc.columnNumber()
-                        script = jedi.Script(text, bl, col, '')
+                        script = jedi.Script(code=text)
                         try:
-                            self.completer.updateCompleteList(script.completions())
+                            self.completer.updateCompleteList(script.complete(line=bl, column=col))
                         except:
                             self.completer.updateCompleteList()
                     else:
@@ -130,22 +129,11 @@ class inputClass(QTextEdit):
     def moveCompleter(self):
         rec = self.cursorRect()
         pt = self.mapToGlobal(rec.bottomRight())
-        y = x = 0
-
-        if self.completer.isVisible():
-            screens = QGuiApplication.screens()
-            currentScreen = None
-
-            # Find the screen that contains the point
-            for screen in screens:
-                if screen.geometry().contains(pt):
-                    currentScreen = screen
-                    break
-
-            if currentScreen:
-                currentScreenGeometry = currentScreen.geometry()
-                futureCompGeo = self.completer.geometry()
-
+        y=x=0
+        if self.completer.isVisible() and self.desk:
+            currentScreen = self.desk.screenGeometry(self.mapToGlobal(rec.bottomRight()))
+            futureCompGeo = self.completer.geometry()
+            futureCompGeo.moveTo(pt)
             if not currentScreen.contains(futureCompGeo):
                 try:
                     i = currentScreen.intersect(futureCompGeo)
@@ -230,7 +218,7 @@ class inputClass(QTextEdit):
             event.ignore()
             return
         # execute selected
-        elif ( event.modifiers() == Qt.ControlModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter] ):
+        elif event.modifiers() == Qt.ControlModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter]:
             if self.completer:
                 self.completer.updateCompleteList()
             self.executeSignal.emit()

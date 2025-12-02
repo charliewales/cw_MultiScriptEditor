@@ -1,41 +1,42 @@
 """
-Jedi is an autocompletion tool for Python that can be used in IDEs/editors.
-Jedi works. Jedi is fast. It understands all of the basic Python syntax
-elements including many builtin functions.
+Jedi is a static analysis tool for Python that is typically used in
+IDEs/editors plugins. Jedi has a focus on autocompletion and goto
+functionality. Other features include refactoring, code search and finding
+references.
 
-Additionaly, Jedi suports two different goto functions and has support for
-renaming as well as Pydoc support and some other IDE features.
+Jedi has a simple API to work with. There is a reference implementation as a
+`VIM-Plugin <https://github.com/davidhalter/jedi-vim>`_. Autocompletion in your
+REPL is also possible, IPython uses it natively and for the CPython REPL you
+can install it. Jedi is well tested and bugs should be rare.
 
-Jedi uses a very simple API to connect with IDE's. There's a reference
-implementation as a `VIM-Plugin <http://github.com/davidhalter/jedi-vim>`_,
-which uses Jedi's autocompletion.  I encourage you to use Jedi in your IDEs.
-It's really easy. If there are any problems (also with licensing), just contact
-me.
-
-To give you a simple example how you can use the Jedi library, here is an
-example for the autocompletion feature:
+Here's a simple example of the autocompletion feature:
 
 >>> import jedi
 >>> source = '''
-... import datetime
-... datetime.da'''
->>> script = jedi.Script(source, 3, len('datetime.da'), 'example.py')
+... import json
+... json.lo'''
+>>> script = jedi.Script(source, path='example.py')
 >>> script
-<Script: 'example.py'>
->>> completions = script.completions()
->>> completions                                         #doctest: +ELLIPSIS
-[<Completion: date>, <Completion: datetime>, ...]
+<Script: 'example.py' ...>
+>>> completions = script.complete(3, len('json.lo'))
+>>> completions
+[<Completion: load>, <Completion: loads>]
 >>> print(completions[0].complete)
-te
+ad
 >>> print(completions[0].name)
-date
-
-As you see Jedi is pretty simple and allows you to concentrate on writing a
-good text editor, while still having very good IDE features for Python.
+load
 """
 
-__version__ = '0.8.1-final0'
+__version__ = '0.19.2'
 
-from jedi.api import Script, Interpreter, NotFoundError, set_debug_function
-from jedi.api import preload_module, defined_names
+from jedi.api import Script, Interpreter, set_debug_function, preload_module
 from jedi import settings
+from jedi.api.environment import find_virtualenvs, find_system_environments, \
+    get_default_environment, InvalidPythonEnvironment, create_environment, \
+    get_system_environment, InterpreterEnvironment
+from jedi.api.project import Project, get_default_project
+from jedi.api.exceptions import InternalError, RefactoringError
+
+# Finally load the internal plugins. This is only internal.
+from jedi.plugins import registry
+del registry

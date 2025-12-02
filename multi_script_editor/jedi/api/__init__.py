@@ -2,545 +2,436 @@
 The API basically only provides one class. You can create a :class:`Script` and
 use its methods.
 
-Additionally you can add a debug function with :func:`set_debug_function` and
-catch :exc:`NotFoundError` which is being raised if your completion is not
-possible.
-
-.. warning:: Please, note that Jedi is **not thread safe**.
+Additionally you can add a debug function with :func:`set_debug_function`.
+Alternatively, if you don't need a custom function and are happy with printing
+debug messages to stdout, simply call :func:`set_debug_function` without
+arguments.
 """
-import re
-import os
-import warnings
 import sys
-from itertools import chain
+from pathlib import Path
 
-from jedi._compatibility import next, unicode, builtins
-from jedi.parser import Parser
-from jedi.parser.tokenize import source_tokens
-from jedi.parser import representation as pr
-from jedi.parser.user_context import UserContext, UserContextParser
+import parso
+from parso.python import tree
+
+from jedi.parser_utils import get_executable_nodes
 from jedi import debug
 from jedi import settings
-from jedi import common
 from jedi import cache
-from jedi.api import keywords
+from jedi.file_io import KnownContentFileIO
 from jedi.api import classes
 from jedi.api import interpreter
-from jedi.api import usages
 from jedi.api import helpers
-from jedi.evaluate import Evaluator, filter_private_variable
-from jedi.evaluate import representation as er
-from jedi.evaluate import compiled
-from jedi.evaluate import imports
-from jedi.evaluate.helpers import FakeName
-from jedi.evaluate.finder import get_names_of_scope
-from jedi.evaluate.helpers import search_call_signatures
-from jedi.evaluate import analysis
+from jedi.api.helpers import validate_line_column
+from jedi.api.completion import Completion, search_in_module
+from jedi.api.keywords import KeywordName
+from jedi.api.environment import InterpreterEnvironment
+from jedi.api.project import get_default_project, Project
+from jedi.api.errors import parso_to_jedi_errors
+from jedi.api import refactoring
+from jedi.api.refactoring.extract import extract_function, extract_variable
+from jedi.inference import InferenceState
+from jedi.inference import imports
+from jedi.inference.references import find_references
+from jedi.inference.arguments import try_iter_content
+from jedi.inference.helpers import infer_call_of_leaf
+from jedi.inference.sys_path import transform_path_to_dotted
+from jedi.inference.syntax_tree import tree_name_to_values
+from jedi.inference.value import ModuleValue
+from jedi.inference.base_value import ValueSet
+from jedi.inference.value.iterable import unpack_tuple_to_dict
+from jedi.inference.gradual.conversion import convert_names, convert_values
+from jedi.inference.gradual.utils import load_proper_stub_module
+from jedi.inference.utils import to_list
 
 # Jedi uses lots and lots of recursion. By setting this a little bit higher, we
 # can remove some "maximum recursion depth" errors.
-sys.setrecursionlimit(2000)
+sys.setrecursionlimit(3000)
 
 
-class NotFoundError(Exception):
-    """A custom error to avoid catching the wrong exceptions."""
-
-
-class Script(object):
+class Script:
     """
     A Script is the base for completions, goto or whatever you want to do with
-    |jedi|.
+    Jedi. The counter part of this class is :class:`Interpreter`, which works
+    with actual dictionaries and can work with a REPL. This class
+    should be used when a user edits code in an editor.
 
-    You can either use the ``source`` parameter or ``path`` to read a file.
+    You can either use the ``code`` parameter or ``path`` to read a file.
     Usually you're going to want to use both of them (in an editor).
 
-    :param source: The source code of the current file, separated by newlines.
-    :type source: str
-    :param line: The line to perform actions on (starting with 1).
-    :type line: int
-    :param col: The column of the cursor (starting with 0).
-    :type col: int
+    The Script's ``sys.path`` is very customizable:
+
+    - If `project` is provided with a ``sys_path``, that is going to be used.
+    - If `environment` is provided, its ``sys.path`` will be used
+      (see :func:`Environment.get_sys_path <jedi.api.environment.Environment.get_sys_path>`);
+    - Otherwise ``sys.path`` will match that of the default environment of
+      Jedi, which typically matches the sys path that was used at the time
+      when Jedi was imported.
+
+    Most methods have a ``line`` and a ``column`` parameter. Lines in Jedi are
+    always 1-based and columns are always zero based. To avoid repetition they
+    are not always documented. You can omit both line and column. Jedi will
+    then just do whatever action you are calling at the end of the file. If you
+    provide only the line, just will complete at the end of that line.
+
+    .. warning:: By default :attr:`jedi.settings.fast_parser` is enabled, which means
+        that parso reuses modules (i.e. they are not immutable). With this setting
+        Jedi is **not thread safe** and it is also not safe to use multiple
+        :class:`.Script` instances and its definitions at the same time.
+
+        If you are a normal plugin developer this should not be an issue. It is
+        an issue for people that do more complex stuff with Jedi.
+
+        This is purely a performance optimization and works pretty well for all
+        typical usages, however consider to turn the setting off if it causes
+        you problems. See also
+        `this discussion <https://github.com/davidhalter/jedi/issues/1240>`_.
+
+    :param code: The source code of the current file, separated by newlines.
+    :type code: str
     :param path: The path of the file in the file system, or ``''`` if
         it hasn't been saved yet.
-    :type path: str or None
-    :param encoding: The encoding of ``source``, if it is not a
-        ``unicode`` object (default ``'utf-8'``).
-    :type encoding: str
-    :param source_encoding: The encoding of ``source``, if it is not a
-        ``unicode`` object (default ``'utf-8'``).
-    :type encoding: str
+    :type path: str or pathlib.Path or None
+    :param Environment environment: Provide a predefined :ref:`Environment <environments>`
+        to work with a specific Python version or virtualenv.
+    :param Project project: Provide a :class:`.Project` to make sure finding
+        references works well, because the right folder is searched. There are
+        also ways to modify the sys path and other things.
     """
-    def __init__(self, source=None, line=None, column=None, path=None,
-                 encoding='utf-8', source_path=None, source_encoding=None):
-        if source_path is not None:
-            warnings.warn("Use path instead of source_path.", DeprecationWarning)
-            path = source_path
-        if source_encoding is not None:
-            warnings.warn("Use encoding instead of source_encoding.", DeprecationWarning)
-            encoding = source_encoding
-
+    def __init__(self, code=None, *, path=None, environment=None, project=None):
         self._orig_path = path
-        self.path = None if path is None else os.path.abspath(path)
+        if isinstance(path, str):
+            path = Path(path)
 
-        if source is None:
-            with open(path) as f:
-                source = f.read()
+        self.path = path.absolute() if path else None
 
-        self.source = common.source_to_unicode(source, encoding)
-        lines = common.splitlines(self.source)
-        line = max(len(lines), 1) if line is None else line
-        if not (0 < line <= len(lines)):
-            raise ValueError('`line` parameter is not in a valid range.')
+        if code is None:
+            if path is None:
+                raise ValueError("Must provide at least one of code or path")
 
-        line_len = len(lines[line - 1])
-        column = line_len if column is None else column
-        if not (0 <= column <= line_len):
-            raise ValueError('`column` parameter is not in a valid range.')
-        self._pos = line, column
+            # TODO add a better warning than the traceback!
+            with open(path, 'rb') as f:
+                code = f.read()
 
-        cache.clear_caches()
-        debug.reset_time()
-        self._user_context = UserContext(self.source, self._pos)
-        self._parser = UserContextParser(self.source, path, self._pos, self._user_context)
-        self._evaluator = Evaluator()
+        if project is None:
+            # Load the Python grammar of the current interpreter.
+            project = get_default_project(None if self.path is None else self.path.parent)
+
+        self._inference_state = InferenceState(
+            project, environment=environment, script_path=self.path
+        )
         debug.speed('init')
+        self._module_node, code = self._inference_state.parse_and_get_code(
+            code=code,
+            path=self.path,
+            use_latest_grammar=path and path.suffix == '.pyi',
+            cache=False,  # No disk cache, because the current script often changes.
+            diff_cache=settings.fast_parser,
+            cache_path=settings.cache_directory,
+        )
+        debug.speed('parsed')
+        self._code_lines = parso.split_lines(code, keepends=True)
+        self._code = code
 
-    @property
-    def source_path(self):
-        """
-        .. deprecated:: 0.7.0
-           Use :attr:`.path` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use path instead of source_path.", DeprecationWarning)
-        return self.path
+        cache.clear_time_caches()
+        debug.reset_time()
+
+    # Cache the module, this is mostly useful for testing, since this shouldn't
+    # be called multiple times.
+    @cache.memoize_method
+    def _get_module(self):
+        names = None
+        is_package = False
+        if self.path is not None:
+            import_names, is_p = transform_path_to_dotted(
+                self._inference_state.get_sys_path(add_parent_paths=False),
+                self.path
+            )
+            if import_names is not None:
+                names = import_names
+                is_package = is_p
+
+        if self.path is None:
+            file_io = None
+        else:
+            file_io = KnownContentFileIO(self.path, self._code)
+        if self.path is not None and self.path.suffix == '.pyi':
+            # We are in a stub file. Try to load the stub properly.
+            stub_module = load_proper_stub_module(
+                self._inference_state,
+                self._inference_state.latest_grammar,
+                file_io,
+                names,
+                self._module_node
+            )
+            if stub_module is not None:
+                return stub_module
+
+        if names is None:
+            names = ('__main__',)
+
+        module = ModuleValue(
+            self._inference_state, self._module_node,
+            file_io=file_io,
+            string_names=names,
+            code_lines=self._code_lines,
+            is_package=is_package,
+        )
+        if names[0] not in ('builtins', 'typing'):
+            # These modules are essential for Jedi, so don't overwrite them.
+            self._inference_state.module_cache.add(names, ValueSet([module]))
+        return module
+
+    def _get_module_context(self):
+        return self._get_module().as_context()
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, repr(self._orig_path))
+        return '<%s: %s %r>' % (
+            self.__class__.__name__,
+            repr(self._orig_path),
+            self._inference_state.environment,
+        )
 
-    def completions(self):
+    @validate_line_column
+    def complete(self, line=None, column=None, *, fuzzy=False):
         """
-        Return :class:`classes.Completion` objects. Those objects contain
-        information about the completions, more than just names.
+        Completes objects under the cursor.
 
-        :return: Completion objects, sorted by name and __ comes last.
-        :rtype: list of :class:`classes.Completion`
+        Those objects contain information about the completions, more than just
+        names.
+
+        :param fuzzy: Default False. Will return fuzzy completions, which means
+            that e.g. ``ooa`` will match ``foobar``.
+        :return: Completion objects, sorted by name. Normal names appear
+            before "private" names that start with ``_`` and those appear
+            before magic methods and name mangled names that start with ``__``.
+        :rtype: list of :class:`.Completion`
         """
-        def get_completions(user_stmt, bs):
-            if isinstance(user_stmt, pr.Import):
-                context = self._user_context.get_context()
-                next(context)  # skip the path
-                if next(context) == 'from':
-                    # completion is just "import" if before stands from ..
-                    return ((k, bs) for k in keywords.keyword_names('import'))
-            return self._simple_complete(path, like)
+        self._inference_state.reset_recursion_limitations()
+        with debug.increase_indent_cm('complete'):
+            completion = Completion(
+                self._inference_state, self._get_module_context(), self._code_lines,
+                (line, column), self.get_signatures, fuzzy=fuzzy,
+            )
+            return completion.complete()
 
-        def completion_possible(path):
-            """
-            The completion logic is kind of complicated, because we strip the
-            last word part. To ignore certain strange patterns with dots, just
-            use regex.
-            """
-            if re.match('\d+\.\.$|\.{4}$', path):
-                return True  # check Ellipsis and float literal `1.`
-
-            return not re.search(r'^\.|^\d\.$|\.\.$', path)
-
-        debug.speed('completions start')
-        path = self._user_context.get_path_until_cursor()
-        if not completion_possible(path):
-            return []
-        path, dot, like = helpers.completion_parts(path)
-
-        user_stmt = self._parser.user_stmt_with_whitespace()
-        b = compiled.builtin
-        completions = get_completions(user_stmt, b)
-
-        if not dot:
-            # add named params
-            for call_sig in self.call_signatures():
-                # allow protected access, because it's a public API.
-                module = call_sig._definition.get_parent_until()
-                # Compiled modules typically don't allow keyword arguments.
-                if not isinstance(module, compiled.CompiledObject):
-                    for p in call_sig.params:
-                        # Allow access on _definition here, because it's a
-                        # public API and we don't want to make the internal
-                        # Name object public.
-                        if p._definition.stars == 0:  # no *args/**kwargs
-                            completions.append((p._definition.get_name(), p))
-
-            if not path and not isinstance(user_stmt, pr.Import):
-                # add keywords
-                completions += ((k, b) for k in keywords.keyword_names(all=True))
-
-        needs_dot = not dot and path
-
-        comps = []
-        comp_dct = {}
-        for c, s in set(completions):
-            n = str(c.names[-1])
-            if settings.case_insensitive_completion \
-                    and n.lower().startswith(like.lower()) \
-                    or n.startswith(like):
-                if not filter_private_variable(s, user_stmt or self._parser.user_scope(), n):
-                    new = classes.Completion(self._evaluator, c, needs_dot, len(like), s)
-                    k = (new.name, new.complete)  # key
-                    if k in comp_dct and settings.no_completion_duplicates:
-                        comp_dct[k]._same_name_completions.append(new)
-                    else:
-                        comp_dct[k] = new
-                        comps.append(new)
-
-        debug.speed('completions end')
-
-        return sorted(comps, key=lambda x: (x.name.startswith('__'),
-                                            x.name.startswith('_'),
-                                            x.name.lower()))
-
-    def _simple_complete(self, path, like):
-        try:
-            scopes = list(self._prepare_goto(path, True))
-        except NotFoundError:
-            scopes = []
-            scope_names_generator = get_names_of_scope(self._evaluator,
-                                                       self._parser.user_scope(),
-                                                       self._pos)
-            completions = []
-            for scope, name_list in scope_names_generator:
-                for c in name_list:
-                    completions.append((c, scope))
-        else:
-            completions = []
-            debug.dbg('possible completion scopes: %s', scopes)
-            for s in scopes:
-                if s.isinstance(er.Function):
-                    names = s.get_magic_function_names()
-                elif isinstance(s, imports.ImportWrapper):
-                    under = like + self._user_context.get_path_after_cursor()
-                    if under == 'import':
-                        current_line = self._user_context.get_position_line()
-                        if not current_line.endswith('import import'):
-                            continue
-                    a = s.import_stmt.alias
-                    if a and a.start_pos <= self._pos <= a.end_pos:
-                        continue
-                    names = s.get_defined_names(on_import_stmt=True)
-                else:
-                    names = []
-                    for _, new_names in s.scope_names_generator():
-                        names += new_names
-
-                for c in names:
-                    completions.append((c, s))
-        return completions
-
-    def _prepare_goto(self, goto_path, is_completion=False):
+    @validate_line_column
+    def infer(self, line=None, column=None, *, only_stubs=False, prefer_stubs=False):
         """
-        Base for completions/goto. Basically it returns the resolved scopes
-        under cursor.
-        """
-        debug.dbg('start: %s in %s', goto_path, self._parser.user_scope())
+        Return the definitions of under the cursor. It is basically a wrapper
+        around Jedi's type inference.
 
-        user_stmt = self._parser.user_stmt_with_whitespace()
-        if not user_stmt and len(goto_path.split('\n')) > 1:
-            # If the user_stmt is not defined and the goto_path is multi line,
-            # something's strange. Most probably the backwards tokenizer
-            # matched to much.
-            return []
-
-        if isinstance(user_stmt, pr.Import):
-            scopes = [helpers.get_on_import_stmt(self._evaluator, self._user_context,
-                                                 user_stmt, is_completion)[0]]
-        else:
-            # just parse one statement, take it and evaluate it
-            eval_stmt = self._get_under_cursor_stmt(goto_path)
-
-            if not is_completion:
-                # goto_definition returns definitions of its statements if the
-                # cursor is on the assignee. By changing the start_pos of our
-                # "pseudo" statement, the Jedi evaluator can find the assignees.
-                if user_stmt is not None:
-                    eval_stmt.start_pos = user_stmt.end_pos
-            scopes = self._evaluator.eval_statement(eval_stmt)
-        return scopes
-
-    def _get_under_cursor_stmt(self, cursor_txt):
-        tokenizer = source_tokens(cursor_txt, line_offset=self._pos[0] - 1)
-        r = Parser(cursor_txt, no_docstr=True, tokenizer=tokenizer)
-        try:
-            # Take the last statement available.
-            stmt = r.module.statements[-1]
-        except IndexError:
-            raise NotFoundError()
-        if isinstance(stmt, pr.KeywordStatement):
-            stmt = stmt.stmt
-        if not isinstance(stmt, pr.Statement):
-            raise NotFoundError()
-
-        user_stmt = self._parser.user_stmt()
-        if user_stmt is None:
-            # Set the start_pos to a pseudo position, that doesn't exist but works
-            # perfectly well (for both completions in docstrings and statements).
-            stmt.start_pos = self._pos
-        else:
-            stmt.start_pos = user_stmt.start_pos
-        stmt.parent = self._parser.user_scope()
-        return stmt
-
-    def complete(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.completions` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use completions instead.", DeprecationWarning)
-        return self.completions()
-
-    def goto(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.goto_assignments` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use goto_assignments instead.", DeprecationWarning)
-        return self.goto_assignments()
-
-    def definition(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.goto_definitions` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use goto_definitions instead.", DeprecationWarning)
-        return self.goto_definitions()
-
-    def get_definition(self):
-        """
-        .. deprecated:: 0.5.0
-           Use :attr:`.goto_definitions` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use goto_definitions instead.", DeprecationWarning)
-        return self.goto_definitions()
-
-    def related_names(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.usages` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use usages instead.", DeprecationWarning)
-        return self.usages()
-
-    def get_in_function_call(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.call_signatures` instead.
-        .. todo:: Remove!
-        """
-        return self.function_definition()
-
-    def function_definition(self):
-        """
-        .. deprecated:: 0.6.0
-           Use :attr:`.call_signatures` instead.
-        .. todo:: Remove!
-        """
-        warnings.warn("Use call_signatures instead.", DeprecationWarning)
-        sig = self.call_signatures()
-        return sig[0] if sig else None
-
-    def goto_definitions(self):
-        """
-        Return the definitions of a the path under the cursor.  goto function!
-        This follows complicated paths and returns the end, not the first
-        definition. The big difference between :meth:`goto_assignments` and
-        :meth:`goto_definitions` is that :meth:`goto_assignments` doesn't
+        This method follows complicated paths and returns the end, not the
+        first definition. The big difference between :meth:`goto` and
+        :meth:`infer` is that :meth:`goto` doesn't
         follow imports and statements. Multiple objects may be returned,
-        because Python itself is a dynamic language, which means depending on
-        an option you can have two different versions of a function.
+        because depending on an option you can have two different versions of a
+        function.
 
-        :rtype: list of :class:`classes.Definition`
+        :param only_stubs: Only return stubs for this method.
+        :param prefer_stubs: Prefer stubs to Python objects for this method.
+        :rtype: list of :class:`.Name`
         """
-        def resolve_import_paths(scopes):
-            for s in scopes.copy():
-                if isinstance(s, imports.ImportWrapper):
-                    scopes.remove(s)
-                    scopes.update(resolve_import_paths(set(s.follow())))
-            return scopes
+        self._inference_state.reset_recursion_limitations()
+        pos = line, column
+        leaf = self._module_node.get_name_of_position(pos)
+        if leaf is None:
+            leaf = self._module_node.get_leaf_for_position(pos)
+            if leaf is None or leaf.type == 'string':
+                return []
+            if leaf.end_pos == (line, column) and leaf.type == 'operator':
+                next_ = leaf.get_next_leaf()
+                if next_.start_pos == leaf.end_pos \
+                        and next_.type in ('number', 'string', 'keyword'):
+                    leaf = next_
 
-        user_stmt = self._parser.user_stmt_with_whitespace()
-        goto_path = self._user_context.get_path_under_cursor()
-        context = self._user_context.get_context()
-        definitions = set()
-        if next(context) in ('class', 'def'):
-            definitions = set([self._parser.user_scope()])
-        else:
-            # Fetch definition of callee, if there's no path otherwise.
-            if not goto_path:
-                (call, _) = search_call_signatures(user_stmt, self._pos)
-                if call is not None:
-                    while call.next is not None:
-                        call = call.next
-                    # reset cursor position:
-                    (row, col) = call.name.end_pos
-                    pos = (row, max(col - 1, 0))
-                    self._user_context = UserContext(self.source, pos)
-                    # then try to find the path again
-                    goto_path = self._user_context.get_path_under_cursor()
+        context = self._get_module_context().create_context(leaf)
 
-        if not definitions:
-            if goto_path:
-                definitions = set(self._prepare_goto(goto_path))
+        values = helpers.infer(self._inference_state, context, leaf)
+        values = convert_values(
+            values,
+            only_stubs=only_stubs,
+            prefer_stubs=prefer_stubs,
+        )
 
-        definitions = resolve_import_paths(definitions)
-        d = set([classes.Definition(self._evaluator, s) for s in definitions
-                 if s is not imports.ImportWrapper.GlobalNamespace])
-        return helpers.sorted_definitions(d)
+        defs = [classes.Name(self._inference_state, c.name) for c in values]
+        # The additional set here allows the definitions to become unique in an
+        # API sense. In the internals we want to separate more things than in
+        # the API.
+        return helpers.sorted_definitions(set(defs))
 
-    def goto_assignments(self):
+    @validate_line_column
+    def goto(self, line=None, column=None, *, follow_imports=False, follow_builtin_imports=False,
+             only_stubs=False, prefer_stubs=False):
         """
-        Return the first definition found. Imports and statements aren't
-        followed. Multiple objects may be returned, because Python itself is a
-        dynamic language, which means depending on an option you can have two
+        Goes to the name that defined the object under the cursor. Optionally
+        you can follow imports.
+        Multiple objects may be returned, depending on an if you can have two
         different versions of a function.
 
-        :rtype: list of :class:`classes.Definition`
+        :param follow_imports: The method will follow imports.
+        :param follow_builtin_imports: If ``follow_imports`` is True will try
+            to look up names in builtins (i.e. compiled or extension modules).
+        :param only_stubs: Only return stubs for this method.
+        :param prefer_stubs: Prefer stubs to Python objects for this method.
+        :rtype: list of :class:`.Name`
         """
-        results, _ = self._goto()
-        d = [classes.Definition(self._evaluator, d) for d in set(results)
-             if d is not imports.ImportWrapper.GlobalNamespace]
-        return helpers.sorted_definitions(d)
+        self._inference_state.reset_recursion_limitations()
+        tree_name = self._module_node.get_name_of_position((line, column))
+        if tree_name is None:
+            # Without a name we really just want to jump to the result e.g.
+            # executed by `foo()`, if we the cursor is after `)`.
+            return self.infer(line, column, only_stubs=only_stubs, prefer_stubs=prefer_stubs)
+        name = self._get_module_context().create_name(tree_name)
 
-    def _goto(self, add_import_name=False):
-        """
-        Used for goto_assignments and usages.
+        # Make it possible to goto the super class function/attribute
+        # definitions, when they are overwritten.
+        names = []
+        if name.tree_name.is_definition() and name.parent_context.is_class():
+            class_node = name.parent_context.tree_node
+            class_value = self._get_module_context().create_value(class_node)
+            mro = class_value.py__mro__()
+            next(mro)  # Ignore the first entry, because it's the class itself.
+            for cls in mro:
+                names = cls.goto(tree_name.value)
+                if names:
+                    break
 
-        :param add_import_name: Add the the name (if import) to the result.
+        if not names:
+            names = list(name.goto())
+
+        if follow_imports:
+            names = helpers.filter_follow_imports(names, follow_builtin_imports)
+        names = convert_names(
+            names,
+            only_stubs=only_stubs,
+            prefer_stubs=prefer_stubs,
+        )
+
+        defs = [classes.Name(self._inference_state, d) for d in set(names)]
+        # Avoid duplicates
+        return list(set(helpers.sorted_definitions(defs)))
+
+    def search(self, string, *, all_scopes=False):
         """
-        def follow_inexistent_imports(defs):
-            """ Imports can be generated, e.g. following
-            `multiprocessing.dummy` generates an import dummy in the
-            multiprocessing module. The Import doesn't exist -> follow.
-            """
-            definitions = set(defs)
-            for d in defs:
-                if isinstance(d.parent, pr.Import) \
-                        and d.start_pos == (0, 0):
-                    i = imports.ImportWrapper(self._evaluator, d.parent).follow(is_goto=True)
-                    definitions.remove(d)
-                    definitions |= follow_inexistent_imports(i)
+        Searches a name in the current file. For a description of how the
+        search string should look like, please have a look at
+        :meth:`.Project.search`.
+
+        :param bool all_scopes: Default False; searches not only for
+            definitions on the top level of a module level, but also in
+            functions and classes.
+        :yields: :class:`.Name`
+        """
+        return self._search_func(string, all_scopes=all_scopes)
+
+    @to_list
+    def _search_func(self, string, all_scopes=False, complete=False, fuzzy=False):
+        names = self._names(all_scopes=all_scopes)
+        wanted_type, wanted_names = helpers.split_search_string(string)
+        return search_in_module(
+            self._inference_state,
+            self._get_module_context(),
+            names=names,
+            wanted_type=wanted_type,
+            wanted_names=wanted_names,
+            complete=complete,
+            fuzzy=fuzzy,
+        )
+
+    def complete_search(self, string, **kwargs):
+        """
+        Like :meth:`.Script.search`, but completes that string. If you want to
+        have all possible definitions in a file you can also provide an empty
+        string.
+
+        :param bool all_scopes: Default False; searches not only for
+            definitions on the top level of a module level, but also in
+            functions and classes.
+        :param fuzzy: Default False. Will return fuzzy completions, which means
+            that e.g. ``ooa`` will match ``foobar``.
+        :yields: :class:`.Completion`
+        """
+        return self._search_func(string, complete=True, **kwargs)
+
+    @validate_line_column
+    def help(self, line=None, column=None):
+        """
+        Used to display a help window to users.  Uses :meth:`.Script.goto` and
+        returns additional definitions for keywords and operators.
+
+        Typically you will want to display :meth:`.BaseName.docstring` to the
+        user for all the returned definitions.
+
+        The additional definitions are ``Name(...).type == 'keyword'``.
+        These definitions do not have a lot of value apart from their docstring
+        attribute, which contains the output of Python's :func:`help` function.
+
+        :rtype: list of :class:`.Name`
+        """
+        self._inference_state.reset_recursion_limitations()
+        definitions = self.goto(line, column, follow_imports=True)
+        if definitions:
             return definitions
+        leaf = self._module_node.get_leaf_for_position((line, column))
 
-        goto_path = self._user_context.get_path_under_cursor()
-        context = self._user_context.get_context()
-        user_stmt = self._parser.user_stmt()
-        if next(context) in ('class', 'def'):
-            user_scope = self._parser.user_scope()
-            definitions = set([user_scope.name])
-            search_name = unicode(user_scope.name)
-        elif isinstance(user_stmt, pr.Import):
-            s, name_part = helpers.get_on_import_stmt(self._evaluator,
-                                                      self._user_context, user_stmt)
-            try:
-                definitions = [s.follow(is_goto=True)[0]]
-            except IndexError:
-                definitions = []
-            search_name = unicode(name_part)
+        if leaf is not None and leaf.end_pos == (line, column) and leaf.type == 'newline':
+            next_ = leaf.get_next_leaf()
+            if next_ is not None and next_.start_pos == leaf.end_pos:
+                leaf = next_
 
-            if add_import_name:
-                import_name = user_stmt.get_defined_names()
-                # imports have only one name
-                if not user_stmt.star \
-                        and unicode(name_part) == unicode(import_name[0].names[-1]):
-                    definitions.append(import_name[0])
-        else:
-            stmt = self._get_under_cursor_stmt(goto_path)
+        if leaf is not None and leaf.type in ('keyword', 'operator', 'error_leaf'):
+            def need_pydoc():
+                if leaf.value in ('(', ')', '[', ']'):
+                    if leaf.parent.type == 'trailer':
+                        return False
+                    if leaf.parent.type == 'atom':
+                        return False
+                grammar = self._inference_state.grammar
+                # This parso stuff is not public, but since I control it, this
+                # is fine :-) ~dave
+                reserved = grammar._pgen_grammar.reserved_syntax_strings.keys()
+                return leaf.value in reserved
 
-            def test_lhs():
-                """
-                Special rule for goto, left hand side of the statement returns
-                itself, if the name is ``foo``, but not ``foo.bar``.
-                """
-                if isinstance(user_stmt, pr.Statement):
-                    for name in user_stmt.get_defined_names():
-                        if name.start_pos <= self._pos <= name.end_pos \
-                                and len(name.names) == 1:
-                            return name, unicode(name.names[-1])
-                return None, None
+            if need_pydoc():
+                name = KeywordName(self._inference_state, leaf.value)
+                return [classes.Name(self._inference_state, name)]
+        return []
 
-            lhs, search_name = test_lhs()
-            if lhs is None:
-                expression_list = stmt.expression_list()
-                if len(expression_list) == 0:
-                    return [], ''
-                # Only the first command is important, the rest should basically not
-                # happen except in broken code (e.g. docstrings that aren't code).
-                call = expression_list[0]
-                if isinstance(call, pr.Call):
-                    call_path = list(call.generate_call_path())
-                else:
-                    call_path = [call]
-
-                defs, search_name_part = self._evaluator.goto(stmt, call_path)
-                search_name = unicode(search_name_part)
-                definitions = follow_inexistent_imports(defs)
-            else:
-                definitions = [lhs]
-            if isinstance(user_stmt, pr.Statement):
-                c = user_stmt.expression_list()
-                if c and not isinstance(c[0], (str, unicode)) \
-                        and c[0].start_pos > self._pos \
-                        and not re.search(r'\.\w+$', goto_path):
-                    # The cursor must be after the start, otherwise the
-                    # statement is just an assignee.
-                    definitions = [user_stmt]
-        return definitions, search_name
-
-    def usages(self, additional_module_paths=()):
+    @validate_line_column
+    def get_references(self, line=None, column=None, **kwargs):
         """
-        Return :class:`classes.Definition` objects, which contain all
-        names that point to the definition of the name under the cursor. This
-        is very useful for refactoring (renaming), or to show all usages of a
-        variable.
+        Lists all references of a variable in a project. Since this can be
+        quite hard to do for Jedi, if it is too complicated, Jedi will stop
+        searching.
 
-        .. todo:: Implement additional_module_paths
-
-        :rtype: list of :class:`classes.Definition`
+        :param include_builtins: Default ``True``. If ``False``, checks if a definition
+            is a builtin (e.g. ``sys``) and in that case does not return it.
+        :param scope: Default ``'project'``. If ``'file'``, include references in
+            the current module only.
+        :rtype: list of :class:`.Name`
         """
-        temp, settings.dynamic_flow_information = \
-            settings.dynamic_flow_information, False
-        user_stmt = self._parser.user_stmt()
-        definitions, search_name = self._goto(add_import_name=True)
-        if isinstance(user_stmt, pr.Statement):
-            c = user_stmt.expression_list()[0]
-            if not isinstance(c, unicode) and self._pos < c.start_pos:
-                # the search_name might be before `=`
-                definitions = [v for v in user_stmt.get_defined_names()
-                               if unicode(v.names[-1]) == search_name]
-        if not isinstance(user_stmt, pr.Import):
-            # import case is looked at with add_import_name option
-            definitions = usages.usages_add_import_modules(self._evaluator, definitions, search_name)
+        self._inference_state.reset_recursion_limitations()
 
-        module = set([d.get_parent_until() for d in definitions])
-        module.add(self._parser.module())
-        names = usages.usages(self._evaluator, definitions, search_name, module)
+        def _references(include_builtins=True, scope='project'):
+            if scope not in ('project', 'file'):
+                raise ValueError('Only the scopes "file" and "project" are allowed')
+            tree_name = self._module_node.get_name_of_position((line, column))
+            if tree_name is None:
+                # Must be syntax
+                return []
 
-        for d in set(definitions):
-            try:
-                name_part = d.names[-1]
-            except AttributeError:
-                names.append(classes.Definition(self._evaluator, d))
-            else:
-                names.append(classes.Definition(self._evaluator, name_part))
+            names = find_references(self._get_module_context(), tree_name, scope == 'file')
 
-        settings.dynamic_flow_information = temp
-        return helpers.sorted_definitions(set(names))
+            definitions = [classes.Name(self._inference_state, n) for n in names]
+            if not include_builtins or scope == 'file':
+                definitions = [d for d in definitions if not d.in_builtin_module()]
+            return helpers.sorted_definitions(definitions)
+        return _references(**kwargs)
 
-    def call_signatures(self):
+    @validate_line_column
+    def get_signatures(self, line=None, column=None):
         """
-        Return the function object of the call you're currently in.
+        Return the function object of the call under the cursor.
 
         E.g. if the cursor is here::
 
@@ -550,166 +441,346 @@ class Script(object):
 
             abs()# <-- cursor is here
 
-        This would return ``None``.
+        This would return an empty list..
 
-        :rtype: list of :class:`classes.CallSignature`
+        :rtype: list of :class:`.Signature`
         """
-        user_stmt = self._parser.user_stmt_with_whitespace()
-        call, index = search_call_signatures(user_stmt, self._pos)
-        if call is None:
+        self._inference_state.reset_recursion_limitations()
+        pos = line, column
+        call_details = helpers.get_signature_details(self._module_node, pos)
+        if call_details is None:
             return []
 
-        stmt_el = call
-        while isinstance(stmt_el.parent, pr.StatementElement):
-            # Go to parent literal/variable until not possible anymore. This
-            # makes it possible to return the whole expression.
-            stmt_el = stmt_el.parent
-        # We can reset the execution since it's a new object
-        # (fast_parent_copy).
-        execution_arr, call.execution = call.execution, None
-
-        with common.scale_speed_settings(settings.scale_call_signatures):
-            _callable = lambda: self._evaluator.eval_call(stmt_el)
-            origins = cache.cache_call_signatures(_callable, self.source,
-                                                  self._pos, user_stmt)
+        context = self._get_module_context().create_context(call_details.bracket_leaf)
+        definitions = helpers.cache_signatures(
+            self._inference_state,
+            context,
+            call_details.bracket_leaf,
+            self._code_lines,
+            pos
+        )
         debug.speed('func_call followed')
 
-        key_name = None
-        try:
-            detail = execution_arr[index].assignment_details[0]
-        except IndexError:
-            pass
+        # TODO here we use stubs instead of the actual values. We should use
+        # the signatures from stubs, but the actual values, probably?!
+        return [classes.Signature(self._inference_state, signature, call_details)
+                for signature in definitions.get_signatures()]
+
+    @validate_line_column
+    def get_context(self, line=None, column=None):
+        """
+        Returns the scope context under the cursor. This basically means the
+        function, class or module where the cursor is at.
+
+        :rtype: :class:`.Name`
+        """
+        pos = (line, column)
+        leaf = self._module_node.get_leaf_for_position(pos, include_prefixes=True)
+        if leaf.start_pos > pos or leaf.type == 'endmarker':
+            previous_leaf = leaf.get_previous_leaf()
+            if previous_leaf is not None:
+                leaf = previous_leaf
+
+        module_context = self._get_module_context()
+
+        n = tree.search_ancestor(leaf, 'funcdef', 'classdef')
+        if n is not None and n.start_pos < pos <= n.children[-1].start_pos:
+            # This is a bit of a special case. The context of a function/class
+            # name/param/keyword is always it's parent context, not the
+            # function itself. Catch all the cases here where we are before the
+            # suite object, but still in the function.
+            context = module_context.create_value(n).as_context()
         else:
-            try:
-                key_name = unicode(detail[0][0].name)
-            except (IndexError, AttributeError):
-                pass
-        return [classes.CallSignature(self._evaluator, o, call, index, key_name)
-                for o in origins if o.is_callable()]
+            context = module_context.create_context(leaf)
+
+        while context.name is None:
+            context = context.parent_context  # comprehensions
+
+        definition = classes.Name(self._inference_state, context.name)
+        while definition.type != 'module':
+            name = definition._name  # TODO private access
+            tree_name = name.tree_name
+            if tree_name is not None:  # Happens with lambdas.
+                scope = tree_name.get_definition()
+                if scope.start_pos[1] < column:
+                    break
+            definition = definition.parent()
+        return definition
 
     def _analysis(self):
-        #statements = set(chain(*self._parser.module().used_names.values()))
-        stmts, imps = analysis.get_module_statements(self._parser.module())
-        # Sort the statements so that the results are reproducible.
-        for i in imps:
-            iw = imports.ImportWrapper(self._evaluator, i,
-                                       nested_resolve=True).follow()
-            if i.is_nested() and any(not isinstance(i, pr.Module) for i in iw):
-                analysis.add(self._evaluator, 'import-error', i.namespace.names[-1])
-        for stmt in sorted(stmts, key=lambda obj: obj.start_pos):
-            if not (isinstance(stmt.parent, pr.ForFlow)
-                    and stmt.parent.set_stmt == stmt):
-                self._evaluator.eval_statement(stmt)
+        self._inference_state.is_analysis = True
+        self._inference_state.analysis_modules = [self._module_node]
+        module = self._get_module_context()
+        try:
+            for node in get_executable_nodes(self._module_node):
+                context = module.create_context(node)
+                if node.type in ('funcdef', 'classdef'):
+                    # Resolve the decorators.
+                    tree_name_to_values(self._inference_state, context, node.children[1])
+                elif isinstance(node, tree.Import):
+                    import_names = set(node.get_defined_names())
+                    if node.is_nested():
+                        import_names |= set(path[-1] for path in node.get_paths())
+                    for n in import_names:
+                        imports.infer_import(context, n)
+                elif node.type == 'expr_stmt':
+                    types = context.infer_node(node)
+                    for testlist in node.children[:-1:2]:
+                        # Iterate tuples.
+                        unpack_tuple_to_dict(context, types, testlist)
+                else:
+                    if node.type == 'name':
+                        defs = self._inference_state.infer(context, node)
+                    else:
+                        defs = infer_call_of_leaf(context, node)
+                    try_iter_content(defs)
+                self._inference_state.reset_recursion_limitations()
 
-        ana = [a for a in self._evaluator.analysis if self.path == a.path]
-        return sorted(set(ana), key=lambda x: x.line)
+            ana = [a for a in self._inference_state.analysis if self.path == a.path]
+            return sorted(set(ana), key=lambda x: x.line)
+        finally:
+            self._inference_state.is_analysis = False
+
+    def get_names(self, **kwargs):
+        """
+        Returns names defined in the current file.
+
+        :param all_scopes: If True lists the names of all scopes instead of
+            only the module namespace.
+        :param definitions: If True lists the names that have been defined by a
+            class, function or a statement (``a = b`` returns ``a``).
+        :param references: If True lists all the names that are not listed by
+            ``definitions=True``. E.g. ``a = b`` returns ``b``.
+        :rtype: list of :class:`.Name`
+        """
+        names = self._names(**kwargs)
+        return [classes.Name(self._inference_state, n) for n in names]
+
+    def get_syntax_errors(self):
+        """
+        Lists all syntax errors in the current file.
+
+        :rtype: list of :class:`.SyntaxError`
+        """
+        return parso_to_jedi_errors(self._inference_state.grammar, self._module_node)
+
+    def _names(self, all_scopes=False, definitions=True, references=False):
+        self._inference_state.reset_recursion_limitations()
+        # Set line/column to a random position, because they don't matter.
+        module_context = self._get_module_context()
+        defs = [
+            module_context.create_name(name)
+            for name in helpers.get_module_names(
+                self._module_node,
+                all_scopes=all_scopes,
+                definitions=definitions,
+                references=references,
+            )
+        ]
+        return sorted(defs, key=lambda x: x.start_pos)
+
+    def rename(self, line=None, column=None, *, new_name):
+        """
+        Renames all references of the variable under the cursor.
+
+        :param new_name: The variable under the cursor will be renamed to this
+            string.
+        :raises: :exc:`.RefactoringError`
+        :rtype: :class:`.Refactoring`
+        """
+        definitions = self.get_references(line, column, include_builtins=False)
+        return refactoring.rename(self._inference_state, definitions, new_name)
+
+    @validate_line_column
+    def extract_variable(self, line, column, *, new_name, until_line=None, until_column=None):
+        """
+        Moves an expression to a new statement.
+
+        For example if you have the cursor on ``foo`` and provide a
+        ``new_name`` called ``bar``::
+
+            foo = 3.1
+            x = int(foo + 1)
+
+        the code above will become::
+
+            foo = 3.1
+            bar = foo + 1
+            x = int(bar)
+
+        :param new_name: The expression under the cursor will be renamed to
+            this string.
+        :param int until_line: The the selection range ends at this line, when
+            omitted, Jedi will be clever and try to define the range itself.
+        :param int until_column: The the selection range ends at this column, when
+            omitted, Jedi will be clever and try to define the range itself.
+        :raises: :exc:`.RefactoringError`
+        :rtype: :class:`.Refactoring`
+        """
+        if until_line is None and until_column is None:
+            until_pos = None
+        else:
+            if until_line is None:
+                until_line = line
+            if until_column is None:
+                until_column = len(self._code_lines[until_line - 1])
+            until_pos = until_line, until_column
+        return extract_variable(
+            self._inference_state, self.path, self._module_node,
+            new_name, (line, column), until_pos
+        )
+
+    @validate_line_column
+    def extract_function(self, line, column, *, new_name, until_line=None, until_column=None):
+        """
+        Moves an expression to a new function.
+
+        For example if you have the cursor on ``foo`` and provide a
+        ``new_name`` called ``bar``::
+
+            global_var = 3
+
+            def x():
+                foo = 3.1
+                x = int(foo + 1 + global_var)
+
+        the code above will become::
+
+            global_var = 3
+
+            def bar(foo):
+                return int(foo + 1 + global_var)
+
+            def x():
+                foo = 3.1
+                x = bar(foo)
+
+        :param new_name: The expression under the cursor will be replaced with
+            a function with this name.
+        :param int until_line: The the selection range ends at this line, when
+            omitted, Jedi will be clever and try to define the range itself.
+        :param int until_column: The the selection range ends at this column, when
+            omitted, Jedi will be clever and try to define the range itself.
+        :raises: :exc:`.RefactoringError`
+        :rtype: :class:`.Refactoring`
+        """
+        if until_line is None and until_column is None:
+            until_pos = None
+        else:
+            if until_line is None:
+                until_line = line
+            if until_column is None:
+                until_column = len(self._code_lines[until_line - 1])
+            until_pos = until_line, until_column
+        return extract_function(
+            self._inference_state, self.path, self._get_module_context(),
+            new_name, (line, column), until_pos
+        )
+
+    def inline(self, line=None, column=None):
+        """
+        Inlines a variable under the cursor. This is basically the opposite of
+        extracting a variable. For example with the cursor on bar::
+
+            foo = 3.1
+            bar = foo + 1
+            x = int(bar)
+
+        the code above will become::
+
+            foo = 3.1
+            x = int(foo + 1)
+
+        :raises: :exc:`.RefactoringError`
+        :rtype: :class:`.Refactoring`
+        """
+        names = [d._name for d in self.get_references(line, column, include_builtins=True)]
+        return refactoring.inline(self._inference_state, names)
 
 
 class Interpreter(Script):
     """
-    Jedi API for Python REPLs.
+    Jedi's API for Python REPLs.
 
-    In addition to completion of simple attribute access, Jedi
-    supports code completion based on static code analysis.
-    Jedi can complete attributes of object which is not initialized
-    yet.
+    Implements all of the methods that are present in :class:`.Script` as well.
+
+    In addition to completions that normal REPL completion does like
+    ``str.upper``, Jedi also supports code completion based on static code
+    analysis. For example Jedi will complete ``str().upper``.
 
     >>> from os.path import join
     >>> namespace = locals()
-    >>> script = Interpreter('join().up', [namespace])
-    >>> print(script.completions()[0].name)
+    >>> script = Interpreter('join("").up', [namespace])
+    >>> print(script.complete()[0].name)
     upper
+
+    All keyword arguments are same as the arguments for :class:`.Script`.
+
+    :param str code: Code to parse.
+    :type namespaces: typing.List[dict]
+    :param namespaces: A list of namespace dictionaries such as the one
+        returned by :func:`globals` and :func:`locals`.
     """
 
-    def __init__(self, source, namespaces=[], **kwds):
-        """
-        Parse `source` and mixin interpreted Python objects from `namespaces`.
+    def __init__(self, code, namespaces, *, project=None, **kwds):
+        try:
+            namespaces = [dict(n) for n in namespaces]
+        except Exception:
+            raise TypeError("namespaces must be a non-empty list of dicts.")
 
-        :type source: str
-        :arg  source: Code to parse.
-        :type namespaces: list of dict
-        :arg  namespaces: a list of namespace dictionaries such as the one
-                          returned by :func:`locals`.
-
-        Other optional arguments are same as the ones for :class:`Script`.
-        If `line` and `column` are None, they are assumed be at the end of
-        `source`.
-        """
-        super(Interpreter, self).__init__(source, **kwds)
-        self.namespaces = namespaces
-
-        # Here we add the namespaces to the current parser.
-        interpreter.create(self._evaluator, namespaces[0], self._parser.module())
-
-    def _simple_complete(self, path, like):
-        user_stmt = self._parser.user_stmt_with_whitespace()
-        is_simple_path = not path or re.search('^[\w][\w\d.]*$', path)
-        if isinstance(user_stmt, pr.Import) or not is_simple_path:
-            return super(Interpreter, self)._simple_complete(path, like)
+        environment = kwds.get('environment', None)
+        if environment is None:
+            environment = InterpreterEnvironment()
         else:
-            class NamespaceModule(object):
-                def __getattr__(_, name):
-                    for n in self.namespaces:
-                        try:
-                            return n[name]
-                        except KeyError:
-                            pass
-                    raise AttributeError()
+            if not isinstance(environment, InterpreterEnvironment):
+                raise TypeError("The environment needs to be an InterpreterEnvironment subclass.")
 
-                def __dir__(_):
-                    gen = (n.keys() for n in self.namespaces)
-                    return list(set(chain.from_iterable(gen)))
+        if project is None:
+            project = Project(Path.cwd())
 
-            paths = path.split('.') if path else []
+        super().__init__(code, environment=environment, project=project, **kwds)
 
-            namespaces = (NamespaceModule(), builtins)
-            for p in paths:
-                old, namespaces = namespaces, []
-                for n in old:
-                    try:
-                        namespaces.append(getattr(n, p))
-                    except AttributeError:
-                        pass
+        self.namespaces = namespaces
+        self._inference_state.allow_unsafe_executions = \
+            settings.allow_unsafe_interpreter_executions
+        # Dynamic params search is important when we work on functions that are
+        # called by other pieces of code. However for interpreter completions
+        # this is not important at all, because the current code is always new
+        # and will never be called by something.
+        # Also sometimes this logic goes a bit too far like in
+        # https://github.com/ipython/ipython/issues/13866, where it takes
+        # seconds to do a simple completion.
+        self._inference_state.do_dynamic_params_search = False
 
-            completions = []
-            for namespace in namespaces:
-                for name in dir(namespace):
-                    if name.lower().startswith(like.lower()):
-                        scope = self._parser.module()
-                        n = FakeName(name, scope)
-                        completions.append((n, scope))
-            return completions
-
-
-def defined_names(source, path=None, encoding='utf-8'):
-    """
-    Get all definitions in `source` sorted by its position.
-
-    This functions can be used for listing functions, classes and
-    data defined in a file.  This can be useful if you want to list
-    them in "sidebar".  Each element in the returned list also has
-    `defined_names` method which can be used to get sub-definitions
-    (e.g., methods in class).
-
-    :rtype: list of classes.Definition
-    """
-    parser = Parser(
-        common.source_to_unicode(source, encoding),
-        module_path=path,
-    )
-    return classes.defined_names(Evaluator(), parser.module)
+    @cache.memoize_method
+    def _get_module_context(self):
+        if self.path is None:
+            file_io = None
+        else:
+            file_io = KnownContentFileIO(self.path, self._code)
+        tree_module_value = ModuleValue(
+            self._inference_state, self._module_node,
+            file_io=file_io,
+            string_names=('__main__',),
+            code_lines=self._code_lines,
+        )
+        return interpreter.MixedModuleContext(
+            tree_module_value,
+            self.namespaces,
+        )
 
 
 def preload_module(*modules):
     """
     Preloading modules tells Jedi to load a module now, instead of lazy parsing
-    of modules. Usful for IDEs, to control which modules to load on startup.
+    of modules. This can be useful for IDEs, to control which modules to load
+    on startup.
 
     :param modules: different module names, list of string.
     """
     for m in modules:
         s = "import %s as x; x." % m
-        Script(s, 1, len(s), None).completions()
+        Script(s).complete(1, len(s))
 
 
 def set_debug_function(func_cb=debug.print_to_stdout, warnings=True,
@@ -717,7 +788,9 @@ def set_debug_function(func_cb=debug.print_to_stdout, warnings=True,
     """
     Define a callback debug function to get all the debug messages.
 
-    :param func_cb: The callback function for debug messages, with n params.
+    If you don't specify any arguments, debug messages will be printed to stdout.
+
+    :param func_cb: The callback function for debug messages.
     """
     debug.debug_function = func_cb
     debug.enable_warning = warnings
