@@ -516,7 +516,7 @@ class inputClass(QTextEdit):
         if event.modifiers() == Qt.ControlModifier:
             if self.completer:
                 self.completer.updateCompleteList()
-            if event.delta() > 0:
+            if event.angleDelta().y() > 0:
                 self.changeFontSize(True)
             else:
                 self.changeFontSize(False)

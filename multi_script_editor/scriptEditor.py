@@ -4,7 +4,7 @@ import traceback
 import webbrowser
 from functools import partial
 
-# # Set preferred binding
+# Set preferred binding
 os.environ["QT_PREFERRED_BINDING"] = os.pathsep.join(["PySide2", "PySide6"])
 
 import managers
