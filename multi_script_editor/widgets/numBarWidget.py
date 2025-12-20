@@ -1,12 +1,12 @@
-from vendor.Qt.QtCore import * 
-from vendor.Qt.QtWidgets import * 
-from vendor.Qt.QtGui import * 
+from vendor.Qt.QtCore import *
+from vendor.Qt.QtWidgets import *
+from vendor.Qt.QtGui import *
 import managers
 
 class lineNumberBarClass(QWidget):
     def __init__(self, edit, parent=None):
         QWidget.__init__(self, parent)
-        
+
         desktop = QApplication.desktop()
         screen_resolution = desktop.screenGeometry()
         width, height = screen_resolution.width(), screen_resolution.height()
@@ -73,11 +73,13 @@ class lineNumberBarClass(QWidget):
             # draw line rect
             if block == current_block:
                 painter.setPen(Qt.NoPen)
-                painter.setBrush(QBrush(self.bg))
-                painter.drawRect(QRect(0,
-                        round(position.y()) - contents_y,
-                        self.width(),
-                        fontSize + (offset/2) ))
+                # Only draw background if self.bg has been initialized
+                if self.bg is not None:
+                    painter.setBrush(QBrush(self.bg))
+                    painter.drawRect(QRect(0,
+                            round(position.y()) - contents_y,
+                            self.width(),
+                            fontSize + (offset/2) ))
                 # restore color
                 painter.setPen(QPen(color))
 

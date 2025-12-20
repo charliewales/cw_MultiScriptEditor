@@ -4,10 +4,14 @@ import traceback
 import webbrowser
 from functools import partial
 
+# # Set preferred binding
+# os.environ["QT_PREFERRED_BINDING"] = os.pathsep.join(["PySide2", "PySide6"])
+
 import managers
 import sessionManager
 import settingsManager
 from icons import *
+import vendor.Qt
 from vendor.help import get_help
 from vendor.Qt.QtCore import *
 from vendor.Qt.QtGui import *
@@ -22,10 +26,10 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
         super(scriptEditorClass, self).__init__(parent)
         # ui
         py_ver = sys.version.split(' ')[0]
-        self.ver = '4.0.0 - Python {0}'.format(py_ver)
+        self.ver = '4.1.0 - Python {0} - {1}'.format(py_ver, vendor.Qt.__binding__)
         self.setupUi(self)
         self.setWindowTitle('Multi Script Editor v%s' % self.ver)
-        self.setObjectName('pw_scriptEditor')
+        self.setObjectName('cw_scriptEditor')
         # widgets
         self.out = outputWidget.outputClass()
         self.out_ly.addWidget(self.out)
@@ -704,3 +708,4 @@ if __name__ == '__main__':
     w = scriptEditorClass()
     w.show()
     app.exec_()
+    # show()

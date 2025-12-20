@@ -3,14 +3,17 @@
 DOCUMENTATION
     Qt.py was born in the film and visual effects industry to address
     the growing need for the development of software capable of running
-    with more than one flavour of the Qt bindings for Python - PySide,
-    PySide2, PyQt4 and PyQt5.
+    with more than one flavour of the Qt bindings for Python.
+
+    Supported Binding: PySide, PySide2, PySide6, PyQt4, PyQt5, PyQt6
 
     1. Build for one, run with all
     2. Explicit is better than implicit
     3. Support co-existence
 
     Default resolution order:
+        - PySide6
+        - PyQt6
         - PySide2
         - PyQt5
         - PySide
@@ -45,10 +48,10 @@ import importlib
 import json
 
 
-__version__ = "1.3.8"
+__version__ = "1.4.8"
 
 # Enable support for `from Qt import *`
-__all__ = []
+__all__ = ["QtCompat"]
 
 # Flags from environment variables
 QT_VERBOSE = bool(os.getenv("QT_VERBOSE"))
@@ -84,9 +87,7 @@ _common_members = {
         "QAbstractEventDispatcher",
         "QAbstractItemModel",
         "QAbstractListModel",
-        "QAbstractState",
         "QAbstractTableModel",
-        "QAbstractTransition",
         "QAnimationGroup",
         "QBasicTimer",
         "QBitArray",
@@ -106,15 +107,11 @@ _common_members = {
         "QElapsedTimer",
         "QEvent",
         "QEventLoop",
-        "QEventTransition",
         "QFile",
         "QFileInfo",
         "QFileSystemWatcher",
-        "QFinalState",
         "QGenericArgument",
         "QGenericReturnArgument",
-        "QHistoryState",
-        "QItemSelectionRange",
         "QIODevice",
         "QLibraryInfo",
         "QLine",
@@ -144,29 +141,21 @@ _common_members = {
         "QReadWriteLock",
         "QRect",
         "QRectF",
-        "QRegExp",
         "QResource",
         "QRunnable",
         "QSemaphore",
         "QSequentialAnimationGroup",
         "QSettings",
         "QSignalMapper",
-        "QSignalTransition",
         "QSize",
         "QSizeF",
         "QSocketNotifier",
-        "QState",
-        "QStateMachine",
         "QSysInfo",
         "QSystemSemaphore",
         "QT_TRANSLATE_NOOP",
         "QT_TR_NOOP",
-        "QT_TR_NOOP_UTF8",
         "QTemporaryFile",
         "QTextBoundaryFinder",
-        "QTextCodec",
-        "QTextDecoder",
-        "QTextEncoder",
         "QTextStream",
         "QTextStreamManipulator",
         "QThread",
@@ -189,15 +178,9 @@ _common_members = {
         "QXmlStreamReader",
         "QXmlStreamWriter",
         "Qt",
-        "QtCriticalMsg",
-        "QtDebugMsg",
-        "QtFatalMsg",
         "QtMsgType",
-        "QtSystemMsg",
-        "QtWarningMsg",
         "qAbs",
         "qAddPostRoutine",
-        "qChecksum",
         "qCritical",
         "qDebug",
         "qFatal",
@@ -205,13 +188,10 @@ _common_members = {
         "qIsFinite",
         "qIsInf",
         "qIsNaN",
-        "qIsNull",
         "qRegisterResourceData",
         "qUnregisterResourceData",
         "qVersion",
         "qWarning",
-        "qrand",
-        "qsrand"
     ],
     "QtGui": [
         "QAbstractTextDocumentLayout",
@@ -277,14 +257,12 @@ _common_members = {
         "QPalette",
         "QPen",
         "QPicture",
-        "QPictureIO",
         "QPixmap",
         "QPixmapCache",
         "QPolygon",
         "QPolygonF",
         "QQuaternion",
         "QRadialGradient",
-        "QRegExpValidator",
         "QRegion",
         "QResizeEvent",
         "QSessionManager",
@@ -335,7 +313,6 @@ _common_members = {
         "qBlue",
         "qGray",
         "qGreen",
-        "qIsGray",
         "qRed",
         "qRgb",
         "qRgba"
@@ -353,17 +330,6 @@ _common_members = {
         "QHelpSearchQueryWidget",
         "QHelpSearchResultWidget"
     ],
-    "QtMultimedia": [
-        "QAbstractVideoBuffer",
-        "QAbstractVideoSurface",
-        "QAudio",
-        "QAudioDeviceInfo",
-        "QAudioFormat",
-        "QAudioInput",
-        "QAudioOutput",
-        "QVideoFrame",
-        "QVideoSurfaceFormat"
-    ],
     "QtNetwork": [
         "QAbstractNetworkCache",
         "QAbstractSocket",
@@ -375,8 +341,6 @@ _common_members = {
         "QNetworkAccessManager",
         "QNetworkAddressEntry",
         "QNetworkCacheMetaData",
-        "QNetworkConfiguration",
-        "QNetworkConfigurationManager",
         "QNetworkCookie",
         "QNetworkCookieJar",
         "QNetworkDiskCache",
@@ -386,17 +350,10 @@ _common_members = {
         "QNetworkProxyQuery",
         "QNetworkReply",
         "QNetworkRequest",
-        "QNetworkSession",
         "QSsl",
         "QTcpServer",
         "QTcpSocket",
         "QUdpSocket"
-    ],
-    "QtOpenGL": [
-        "QGL",
-        "QGLContext",
-        "QGLFormat",
-        "QGLWidget"
     ],
     "QtPrintSupport": [
         "QAbstractPrintDialog",
@@ -407,23 +364,6 @@ _common_members = {
         "QPrintPreviewWidget",
         "QPrinter",
         "QPrinterInfo"
-    ],
-    "QtSql": [
-        "QSql",
-        "QSqlDatabase",
-        "QSqlDriver",
-        "QSqlDriverCreatorBase",
-        "QSqlError",
-        "QSqlField",
-        "QSqlIndex",
-        "QSqlQuery",
-        "QSqlQueryModel",
-        "QSqlRecord",
-        "QSqlRelation",
-        "QSqlRelationalDelegate",
-        "QSqlRelationalTableModel",
-        "QSqlResult",
-        "QSqlTableModel"
     ],
     "QtSvg": [
         "QGraphicsSvgItem",
@@ -443,7 +383,6 @@ _common_members = {
         "QAbstractSlider",
         "QAbstractSpinBox",
         "QAction",
-        "QActionGroup",
         "QApplication",
         "QBoxLayout",
         "QButtonGroup",
@@ -458,11 +397,9 @@ _common_members = {
         "QDataWidgetMapper",
         "QDateEdit",
         "QDateTimeEdit",
-        "QDesktopWidget",
         "QDial",
         "QDialog",
         "QDialogButtonBox",
-        "QDirModel",
         "QDockWidget",
         "QDoubleSpinBox",
         "QErrorMessage",
@@ -523,7 +460,6 @@ _common_members = {
         "QItemDelegate",
         "QItemEditorCreatorBase",
         "QItemEditorFactory",
-        "QKeyEventTransition",
         "QLCDNumber",
         "QLabel",
         "QLayout",
@@ -538,7 +474,6 @@ _common_members = {
         "QMenu",
         "QMenuBar",
         "QMessageBox",
-        "QMouseEventTransition",
         "QPanGesture",
         "QPinchGesture",
         "QPlainTextDocumentLayout",
@@ -550,7 +485,6 @@ _common_members = {
         "QRubberBand",
         "QScrollArea",
         "QScrollBar",
-        "QShortcut",
         "QSizeGrip",
         "QSizePolicy",
         "QSlider",
@@ -614,9 +548,6 @@ _common_members = {
         "QTreeWidget",
         "QTreeWidgetItem",
         "QTreeWidgetItemIterator",
-        "QUndoCommand",
-        "QUndoGroup",
-        "QUndoStack",
         "QUndoView",
         "QVBoxLayout",
         "QWhatsThis",
@@ -625,9 +556,6 @@ _common_members = {
         "QWidgetItem",
         "QWizard",
         "QWizardPage"
-    ],
-    "QtX11Extras": [
-        "QX11Info"
     ],
     "QtXml": [
         "QDomAttr",
@@ -646,38 +574,7 @@ _common_members = {
         "QDomNodeList",
         "QDomNotation",
         "QDomProcessingInstruction",
-        "QDomText",
-        "QXmlAttributes",
-        "QXmlContentHandler",
-        "QXmlDTDHandler",
-        "QXmlDeclHandler",
-        "QXmlDefaultHandler",
-        "QXmlEntityResolver",
-        "QXmlErrorHandler",
-        "QXmlInputSource",
-        "QXmlLexicalHandler",
-        "QXmlLocator",
-        "QXmlNamespaceSupport",
-        "QXmlParseException",
-        "QXmlReader",
-        "QXmlSimpleReader"
-    ],
-    "QtXmlPatterns": [
-        "QAbstractMessageHandler",
-        "QAbstractUriResolver",
-        "QAbstractXmlNodeModel",
-        "QAbstractXmlReceiver",
-        "QSourceLocation",
-        "QXmlFormatter",
-        "QXmlItem",
-        "QXmlName",
-        "QXmlNamePool",
-        "QXmlNodeModelIndex",
-        "QXmlQuery",
-        "QXmlResultItems",
-        "QXmlSchema",
-        "QXmlSchemaValidator",
-        "QXmlSerializer"
+        "QDomText"
     ]
 }
 
@@ -730,12 +627,14 @@ def _qInstallMessageHandler(handler):
     passObject = messageOutputHandler if handler else handler
     if Qt.IsPySide or Qt.IsPyQt4:
         return Qt._QtCore.qInstallMsgHandler(passObject)
-    elif Qt.IsPySide2 or Qt.IsPyQt5:
+    elif Qt.IsPySide2 or Qt.IsPyQt5 or Qt.IsPySide6 or Qt.IsPyQt6:
         return Qt._QtCore.qInstallMessageHandler(passObject)
 
 
 def _getcpppointer(object):
-    if hasattr(Qt, "_shiboken2"):
+    if hasattr(Qt, "_shiboken6"):
+        return getattr(Qt, "_shiboken6").getCppPointer(object)[0]
+    elif hasattr(Qt, "_shiboken2"):
         return getattr(Qt, "_shiboken2").getCppPointer(object)[0]
     elif hasattr(Qt, "_shiboken"):
         return getattr(Qt, "_shiboken").getCppPointer(object)[0]
@@ -769,10 +668,12 @@ def _wrapinstance(ptr, base=None):
     assert (base is None) or issubclass(base, Qt.QtCore.QObject), (
         "Argument 'base' must be of type <QObject>")
 
-    if Qt.IsPyQt4 or Qt.IsPyQt5:
+    if Qt.IsPyQt4 or Qt.IsPyQt5 or Qt.IsPyQt6:
         func = getattr(Qt, "_sip").wrapinstance
     elif Qt.IsPySide2:
         func = getattr(Qt, "_shiboken2").wrapInstance
+    elif Qt.IsPySide6:
+        func = getattr(Qt, "_shiboken6").wrapInstance
     elif Qt.IsPySide:
         func = getattr(Qt, "_shiboken").wrapInstance
     else:
@@ -812,7 +713,10 @@ def _isvalid(object):
         object (QObject): QObject to check the validity of.
 
     """
-    if hasattr(Qt, "_shiboken2"):
+    if hasattr(Qt, "_shiboken6"):
+        return getattr(Qt, "_shiboken6").isValid(object)
+
+    elif hasattr(Qt, "_shiboken2"):
         return getattr(Qt, "_shiboken2").isValid(object)
 
     elif hasattr(Qt, "_shiboken"):
@@ -860,7 +764,7 @@ def _translate(context, sourceText, *args):
         else:
             encoding = n_or_encoding
 
-    if Qt.__binding__ in ("PySide2", "PyQt5"):
+    if Qt.__binding__ in ("PySide2", "PySide6", "PyQt5", "PyQt6"):
         sanitized_args = [context, sourceText, disambiguation, n]
     else:
         sanitized_args = [
@@ -893,7 +797,25 @@ def _loadUi(uifile, baseinstance=None):
 
     """
     if hasattr(Qt, "_uic"):
-        return Qt._uic.loadUi(uifile, baseinstance)
+        if not Qt.IsPyQt6:
+            return Qt._uic.loadUi(uifile, baseinstance)
+
+        # loadUi in PyQt6 chains all exceptions in their own internal exception
+        # type `PyQt6.uic.exceptions.UIFileException`. This code removes the
+        # extra wrapping exception and raises the underlying exception that
+        # matches those raised by PyQt5, PySide2 and PySide6 exceptions. Any
+        # other exceptions will still raise the original PyQt6 specific error.
+        from xml.etree import ElementTree
+
+        try:
+            return Qt._uic.loadUi(uifile, baseinstance)
+        except Qt._uic.exceptions.UIFileException as error:
+            context = error.__context__
+            # Raise the exceptions that are consistent with the other bindings
+            if isinstance(context, (IOError, ElementTree.ParseError)):
+                raise context
+            # Otherwise raise the original PyQt6 specific exception.
+            raise
 
     elif hasattr(Qt, "_QtUiTools"):
         # Implement `PyQt5.uic.loadUi` for PySide(2)
@@ -944,7 +866,14 @@ def _loadUi(uifile, baseinstance=None):
                 for custom_widget in custom_widgets:
                     class_name = custom_widget.find("class").text
                     header = custom_widget.find("header").text
-                    module = importlib.import_module(headerToModule(header))
+
+                    try:
+                        # try to import the module using the header as defined by the user
+                        module = importlib.import_module(header)
+                    except ImportError:
+                        # try again, but use the customized conversion of a path to a module
+                        module = importlib.import_module(headerToModule(header))
+
                     self.custom_widgets[class_name] = getattr(module,
                                                               class_name)
 
@@ -1008,15 +937,153 @@ def _loadUi(uifile, baseinstance=None):
         raise NotImplementedError("No implementation available for loadUi")
 
 
+def _enum_to_value(enum):
+    """Returns the int value of the given enum.
+    """
+    return enum.value
+
+
+def _enum_to_int(enum):
+    """Returns the int value of the given enum.
+    """
+    return int(enum)
+
+
+def _convert_font_weights(weight, in_qt, out_qt="enum"):
+    """Helper function to convert between legacy Qt and OpenType font weights.
+
+    Converted to python from the Qt source code for QFont.
+    https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/text/qfont.cpp?h=6.8.3#n146
+
+    Args:
+        weight(int): The font weight to convert.
+        inverted(bool): `True` converts OpenType to legacy(Qt6->Qt5). `False`
+            converts legacy to OpenType(Qt5->Qt6).
+    """
+    if not hasattr(Qt._QtGui.QFont.Weight, "Thin"):
+        # Qt4 and older versions of Qt5 don't support fully qualified enum
+        # names and don't define all of the enums.
+        # Map of (Qt4, Qt6, Enum) for the various font weights.
+        legacy_to_opentype_map = [
+            (0, 100, 0),  # Ultralight
+            (25, 300, Qt._QtGui.QFont.Light),
+            (50, 400, Qt._QtGui.QFont.Normal),
+            (63, 600, Qt._QtGui.QFont.DemiBold),
+            (75, 700, Qt._QtGui.QFont.Bold),
+            (87, 900, Qt._QtGui.QFont.Black),
+        ]
+    else:
+        # Map of (Qt5, Qt6, Enum) for the various font weights.
+        legacy_to_opentype_map = [
+            (0, 100, Qt._QtGui.QFont.Weight.Thin),
+            (12, 200, Qt._QtGui.QFont.Weight.ExtraLight),
+            (25, 300, Qt._QtGui.QFont.Weight.Light),
+            (50, 400, Qt._QtGui.QFont.Weight.Normal),
+            (57, 500, Qt._QtGui.QFont.Weight.Medium),
+            (63, 600, Qt._QtGui.QFont.Weight.DemiBold),
+            (75, 700, Qt._QtGui.QFont.Weight.Bold),
+            (81, 800, Qt._QtGui.QFont.Weight.ExtraBold),
+            (87, 900, Qt._QtGui.QFont.Weight.Black),
+        ]
+    # Convert the Qt version to the correct column index in the map
+    qt_version_map = {4: 0, 5: 0, 6: 1, "enum": 2}
+    in_qt = qt_version_map[in_qt]
+    out_qt = qt_version_map[out_qt]
+
+    closest_dist = sys.maxsize
+    result = None
+
+    for mapping in legacy_to_opentype_map:
+        weight_old = mapping[in_qt]
+        weight_new = mapping[out_qt]
+        dist = abs(weight_old - weight)
+
+        if dist < closest_dist:
+            result = weight_new
+            closest_dist = dist
+        else:
+            break
+
+    return result
+
+
+def _qfont_from_qt6(descrip):
+    """Convert font strings generated in Qt6 to Qt4 and 5 compliant strings.
+
+    Qt6: "Courier New,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+    Qt5: "Courier New,8.25,-1,5,50,0,0,0,0,0"
+
+    A Font string is a comma separated list of 9-11 items for Qt4,5 and 16-17
+    items for Qt 6. Here is a breakdown of each column's data.
+    # Qt4,5 and 6
+    - Font family
+    - Point size
+    - Pixel size
+    - Style hint
+    - Font weight (See _convert_font_weights for how weight is valued.)
+    - Font style
+    - Underline
+    - Strike out
+    - Fixed pitch
+    - Always 0
+    # Qt6 only
+    - Capitalization
+    - Letter spacing
+    - Word spacing
+    - Stretch
+    - Style strategy
+    # Qt4,5 and 6. Optional and always last if specified.
+    - Font style (omitted when unavailable)
+    """
+
+    # Convert Qt6 strings into Qt5 formats.
+    parts = descrip.split(",")
+    if len(parts) <= 11:
+        # Qt5 style strings have 10 or 11 parts. We don't need to process
+        # strings with fewer parts.
+        return descrip
+
+    style = parts[-1] if len(parts) == 17 else None
+
+    # Convert from the Open Type to legacy font weight.
+    weight = int(parts[4])
+    weight = _convert_font_weights(weight, 6, 5)
+    parts[4] = str(weight)
+
+    ret = parts[:10]
+    if style is not None:
+        ret.append(style)
+
+    return ",".join(ret)
+
+
+def _fromStringQt5(func):
+    # Decorator for Qt5 to handle converting a Qt6 QFont string to Qt5.
+    def wrapper(self, descrip):
+        descrip = _qfont_from_qt6(descrip)
+        return func(self, descrip)
+
+    wrapper.__doc__ = func.__doc__
+    wrapper.__name__ = func.__name__
+
+    return wrapper
+
+
 """Misplaced members
 
 These members from the original submodule are misplaced relative PySide2
 
+NOTE: For bindings where a member is not replaced, they still
+      need to be added such that they are added to Qt.py
+
 """
 _misplaced_members = {
-    "PySide2": {
+    "PySide6": {
+        "QtGui.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtGui.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtGui.QUndoStack": "QtWidgets.QUndoStack",
+        "QtGui.QActionGroup": "QtWidgets.QActionGroup",
         "QtCore.QStringListModel": "QtCore.QStringListModel",
-        "QtGui.QStringListModel": "QtCore.QStringListModel",
         "QtCore.Property": "QtCore.Property",
         "QtCore.Signal": "QtCore.Signal",
         "QtCore.Slot": "QtCore.Slot",
@@ -1025,6 +1092,92 @@ _misplaced_members = {
         "QtCore.QItemSelection": "QtCore.QItemSelection",
         "QtCore.QItemSelectionModel": "QtCore.QItemSelectionModel",
         "QtCore.QItemSelectionRange": "QtCore.QItemSelectionRange",
+        "QtCore.QRegularExpression": "QtCore.QRegExp",
+        "QtStateMachine.QStateMachine": "QtCore.QStateMachine",
+        "QtStateMachine.QState": "QtCore.QState",
+        "QtGui.QRegularExpressionValidator": "QtGui.QRegExpValidator",
+        "QtGui.QShortcut": "QtWidgets.QShortcut",
+        "QtGui.QAction": "QtWidgets.QAction",
+        "QtSvgWidgets.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvgWidgets.QSvgWidget": "QtSvg.QSvgWidget",
+        "QtUiTools.QUiLoader": ["QtCompat.loadUi", _loadUi],
+        "shiboken6.wrapInstance": ["QtCompat.wrapInstance", _wrapinstance],
+        "shiboken6.getCppPointer": ["QtCompat.getCppPointer", _getcpppointer],
+        "shiboken6.isValid": ["QtCompat.isValid", _isvalid],
+        "QtWidgets.qApp": "QtWidgets.QApplication.instance()",
+        "QtCore.QCoreApplication.translate": [
+            "QtCompat.translate", _translate
+        ],
+        "QtWidgets.QApplication.translate": [
+            "QtCompat.translate", _translate
+        ],
+        "QtCore.qInstallMessageHandler": [
+            "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
+        ],
+        "QtWidgets.QStyleOptionViewItem": "QtCompat.QStyleOptionViewItemV4",
+    },
+    "PyQt6": {
+        "QtGui.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtGui.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtGui.QUndoStack": "QtWidgets.QUndoStack",
+        "QtGui.QActionGroup": "QtWidgets.QActionGroup",
+        "QtCore.QStringListModel": "QtCore.QStringListModel",
+        "QtCore.pyqtProperty": "QtCore.Property",
+        "QtCore.pyqtSignal": "QtCore.Signal",
+        "QtCore.pyqtSlot": "QtCore.Slot",
+        "QtCore.QAbstractProxyModel": "QtCore.QAbstractProxyModel",
+        "QtCore.QSortFilterProxyModel": "QtCore.QSortFilterProxyModel",
+        "QtCore.QItemSelection": "QtCore.QItemSelection",
+        "QtCore.QItemSelectionModel": "QtCore.QItemSelectionModel",
+        "QtCore.QItemSelectionRange": "QtCore.QItemSelectionRange",
+        "QtCore.QRegularExpression": "QtCore.QRegExp",
+        "QtStateMachine.QStateMachine": "QtCore.QStateMachine",
+        "QtStateMachine.QState": "QtCore.QState",
+        "QtGui.QRegularExpressionValidator": "QtGui.QRegExpValidator",
+        "QtGui.QShortcut": "QtWidgets.QShortcut",
+        "QtGui.QAction": "QtWidgets.QAction",
+        "QtGui.QFileSystemModel": "QtWidgets.QFileSystemModel",
+        "QtSvgWidgets.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvgWidgets.QSvgWidget": "QtSvg.QSvgWidget",
+        "uic.loadUi": ["QtCompat.loadUi", _loadUi],
+        "sip.wrapinstance": ["QtCompat.wrapInstance", _wrapinstance],
+        "sip.unwrapinstance": ["QtCompat.getCppPointer", _getcpppointer],
+        "sip.isdeleted": ["QtCompat.isValid", _isvalid],
+        "QtWidgets.qApp": "QtWidgets.QApplication.instance()",
+        "QtCore.QCoreApplication.translate": [
+            "QtCompat.translate", _translate
+        ],
+        "QtWidgets.QApplication.translate": [
+            "QtCompat.translate", _translate
+        ],
+        "QtCore.qInstallMessageHandler": [
+            "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
+        ],
+        "QtWidgets.QStyleOptionViewItem": "QtCompat.QStyleOptionViewItemV4",
+    },
+    "PySide2": {
+        "QtWidgets.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtWidgets.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtWidgets.QUndoStack": "QtWidgets.QUndoStack",
+        "QtWidgets.QActionGroup": "QtWidgets.QActionGroup",
+        "QtCore.QStringListModel": "QtCore.QStringListModel",
+
+        # Older versions of PySide2 still left this in QtGui, this accounts for those too
+        "QtGui.QStringListModel": "QtCore.QStringListModel",
+
+        "QtCore.Property": "QtCore.Property",
+        "QtCore.Signal": "QtCore.Signal",
+        "QtCore.Slot": "QtCore.Slot",
+        "QtCore.QRegExp": "QtCore.QRegExp",
+        "QtWidgets.QShortcut": "QtWidgets.QShortcut",
+        "QtGui.QRegExpValidator": "QtGui.QRegExpValidator",
+        "QtCore.QAbstractProxyModel": "QtCore.QAbstractProxyModel",
+        "QtCore.QSortFilterProxyModel": "QtCore.QSortFilterProxyModel",
+        "QtCore.QItemSelection": "QtCore.QItemSelection",
+        "QtCore.QItemSelectionModel": "QtCore.QItemSelectionModel",
+        "QtCore.QItemSelectionRange": "QtCore.QItemSelectionRange",
+        "QtSvg.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvg.QSvgWidget": "QtSvg.QSvgWidget",
         "QtUiTools.QUiLoader": ["QtCompat.loadUi", _loadUi],
         "shiboken2.wrapInstance": ["QtCompat.wrapInstance", _wrapinstance],
         "shiboken2.getCppPointer": ["QtCompat.getCppPointer", _getcpppointer],
@@ -1040,9 +1193,12 @@ _misplaced_members = {
             "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
         ],
         "QtWidgets.QStyleOptionViewItem": "QtCompat.QStyleOptionViewItemV4",
-        "QtMultimedia.QSound": "QtMultimedia.QSound",
     },
     "PyQt5": {
+        "QtWidgets.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtWidgets.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtWidgets.QUndoStack": "QtWidgets.QUndoStack",
+        "QtWidgets.QActionGroup": "QtWidgets.QActionGroup",
         "QtCore.pyqtProperty": "QtCore.Property",
         "QtCore.pyqtSignal": "QtCore.Signal",
         "QtCore.pyqtSlot": "QtCore.Slot",
@@ -1052,11 +1208,15 @@ _misplaced_members = {
         "QtCore.QItemSelection": "QtCore.QItemSelection",
         "QtCore.QItemSelectionModel": "QtCore.QItemSelectionModel",
         "QtCore.QItemSelectionRange": "QtCore.QItemSelectionRange",
+        "QtSvg.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvg.QSvgWidget": "QtSvg.QSvgWidget",
         "uic.loadUi": ["QtCompat.loadUi", _loadUi],
         "sip.wrapinstance": ["QtCompat.wrapInstance", _wrapinstance],
         "sip.unwrapinstance": ["QtCompat.getCppPointer", _getcpppointer],
         "sip.isdeleted": ["QtCompat.isValid", _isvalid],
         "QtWidgets.qApp": "QtWidgets.QApplication.instance()",
+        "QtGui.QRegExpValidator": "QtGui.QRegExpValidator",
+        "QtCore.QRegExp": "QtCore.QRegExp",
         "QtCore.QCoreApplication.translate": [
             "QtCompat.translate", _translate
         ],
@@ -1066,32 +1226,41 @@ _misplaced_members = {
         "QtCore.qInstallMessageHandler": [
             "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
         ],
+        "QtWidgets.QShortcut": "QtWidgets.QShortcut",
         "QtWidgets.QStyleOptionViewItem": "QtCompat.QStyleOptionViewItemV4",
-        "QtMultimedia.QSound": "QtMultimedia.QSound",
     },
     "PySide": {
+        "QtGui.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtGui.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtGui.QUndoStack": "QtWidgets.QUndoStack",
+        "QtGui.QActionGroup": "QtWidgets.QActionGroup",
+        "QtCore.Property": "QtCore.Property",
+        "QtCore.Signal": "QtCore.Signal",
+        "QtCore.Slot": "QtCore.Slot",
         "QtGui.QAbstractProxyModel": "QtCore.QAbstractProxyModel",
         "QtGui.QSortFilterProxyModel": "QtCore.QSortFilterProxyModel",
         "QtGui.QStringListModel": "QtCore.QStringListModel",
         "QtGui.QItemSelection": "QtCore.QItemSelection",
         "QtGui.QItemSelectionModel": "QtCore.QItemSelectionModel",
-        "QtCore.Property": "QtCore.Property",
-        "QtCore.Signal": "QtCore.Signal",
-        "QtCore.Slot": "QtCore.Slot",
         "QtGui.QItemSelectionRange": "QtCore.QItemSelectionRange",
         "QtGui.QAbstractPrintDialog": "QtPrintSupport.QAbstractPrintDialog",
+        "QtGui.QRegExpValidator": "QtGui.QRegExpValidator",
         "QtGui.QPageSetupDialog": "QtPrintSupport.QPageSetupDialog",
         "QtGui.QPrintDialog": "QtPrintSupport.QPrintDialog",
         "QtGui.QPrintEngine": "QtPrintSupport.QPrintEngine",
         "QtGui.QPrintPreviewDialog": "QtPrintSupport.QPrintPreviewDialog",
         "QtGui.QPrintPreviewWidget": "QtPrintSupport.QPrintPreviewWidget",
         "QtGui.QPrinter": "QtPrintSupport.QPrinter",
+        "QtWidgets.QShortcut": "QtWidgets.QShortcut",
         "QtGui.QPrinterInfo": "QtPrintSupport.QPrinterInfo",
+        "QtSvg.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvg.QSvgWidget": "QtSvg.QSvgWidget",
         "QtUiTools.QUiLoader": ["QtCompat.loadUi", _loadUi],
         "shiboken.wrapInstance": ["QtCompat.wrapInstance", _wrapinstance],
         "shiboken.unwrapInstance": ["QtCompat.getCppPointer", _getcpppointer],
         "shiboken.isValid": ["QtCompat.isValid", _isvalid],
         "QtGui.qApp": "QtWidgets.QApplication.instance()",
+        "QtCore.QRegExp": "QtCore.QRegExp",
         "QtCore.QCoreApplication.translate": [
             "QtCompat.translate", _translate
         ],
@@ -1102,9 +1271,12 @@ _misplaced_members = {
             "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
         ],
         "QtGui.QStyleOptionViewItemV4": "QtCompat.QStyleOptionViewItemV4",
-        "QtGui.QSound": "QtMultimedia.QSound",
     },
     "PyQt4": {
+        "QtGui.QUndoCommand": "QtWidgets.QUndoCommand",
+        "QtGui.QUndoGroup": "QtWidgets.QUndoGroup",
+        "QtGui.QUndoStack": "QtWidgets.QUndoStack",
+        "QtGui.QActionGroup": "QtWidgets.QActionGroup",
         "QtGui.QAbstractProxyModel": "QtCore.QAbstractProxyModel",
         "QtGui.QSortFilterProxyModel": "QtCore.QSortFilterProxyModel",
         "QtGui.QItemSelection": "QtCore.QItemSelection",
@@ -1115,20 +1287,24 @@ _misplaced_members = {
         "QtCore.pyqtSlot": "QtCore.Slot",
         "QtGui.QItemSelectionRange": "QtCore.QItemSelectionRange",
         "QtGui.QAbstractPrintDialog": "QtPrintSupport.QAbstractPrintDialog",
+        "QtGui.QRegExpValidator": "QtGui.QRegExpValidator",
         "QtGui.QPageSetupDialog": "QtPrintSupport.QPageSetupDialog",
         "QtGui.QPrintDialog": "QtPrintSupport.QPrintDialog",
         "QtGui.QPrintEngine": "QtPrintSupport.QPrintEngine",
+        "QtWidgets.QShortcut": "QtWidgets.QShortcut",
         "QtGui.QPrintPreviewDialog": "QtPrintSupport.QPrintPreviewDialog",
         "QtGui.QPrintPreviewWidget": "QtPrintSupport.QPrintPreviewWidget",
         "QtGui.QPrinter": "QtPrintSupport.QPrinter",
         "QtGui.QPrinterInfo": "QtPrintSupport.QPrinterInfo",
-        # "QtCore.pyqtSignature": "QtCore.Slot",
+        "QtSvg.QGraphicsSvgItem": "QtSvg.QGraphicsSvgItem",
+        "QtSvg.QSvgWidget": "QtSvg.QSvgWidget",
         "uic.loadUi": ["QtCompat.loadUi", _loadUi],
         "sip.wrapinstance": ["QtCompat.wrapInstance", _wrapinstance],
         "sip.unwrapinstance": ["QtCompat.getCppPointer", _getcpppointer],
         "sip.isdeleted": ["QtCompat.isValid", _isvalid],
         "QtCore.QString": "str",
         "QtGui.qApp": "QtWidgets.QApplication.instance()",
+        "QtCore.QRegExp": "QtCore.QRegExp",
         "QtCore.QCoreApplication.translate": [
             "QtCompat.translate", _translate
         ],
@@ -1139,7 +1315,6 @@ _misplaced_members = {
             "QtCompat.qInstallMessageHandler", _qInstallMessageHandler
         ],
         "QtGui.QStyleOptionViewItemV4": "QtCompat.QStyleOptionViewItemV4",
-        "QtGui.QSound": "QtMultimedia.QSound",
     }
 }
 
@@ -1157,7 +1332,25 @@ interface for obsolete members, and differences in binding return values.
 }
 """
 _compatibility_members = {
-    "PySide2": {
+    "PySide6": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec",
+        },
+        "QDialog": {
+            "exec_": "QtWidgets.QDialog.exec",
+        },
+        "QMenu": {
+            "exec_": "QtWidgets.QMenu.exec",
+        },
+        "QMessageBox": {
+            "exec_": "QtWidgets.QMessageBox.exec",
+        },
+        "QFontDialog": {
+            "exec_": "QtWidgets.QFontDialog.exec",
+        },
         "QWidget": {
             "grab": "QtWidgets.QWidget.grab",
         },
@@ -1175,9 +1368,113 @@ _compatibility_members = {
             "getOpenFileName": "QtWidgets.QFileDialog.getOpenFileName",
             "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
             "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
+        },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "QTextEdit": {
+            "setTabStopWidth": "QtWidgets.QTextEdit.setTabStopDistance",
+        },
+        "QTextBrowser": {
+            "setTabStopWidth": "QtWidgets.QTextBrowser.setTabStopDistance",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MiddleButton",
+        },
+    },
+    "PyQt6": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec",
+        },
+        "QDialog": {
+            "exec_": "QtWidgets.QDialog.exec",
+        },
+        "QMenu": {
+            "exec_": "QtWidgets.QMenu.exec",
+        },
+        "QMessageBox": {
+            "exec_": "QtWidgets.QMessageBox.exec",
+        },
+        "QFontDialog": {
+            "exec_": "QtWidgets.QFontDialog.exec",
+        },
+        "QWidget": {
+            "grab": "QtWidgets.QWidget.grab",
+        },
+        "QHeaderView": {
+            "sectionsClickable": "QtWidgets.QHeaderView.sectionsClickable",
+            "setSectionsClickable":
+                "QtWidgets.QHeaderView.setSectionsClickable",
+            "sectionResizeMode": "QtWidgets.QHeaderView.sectionResizeMode",
+            "setSectionResizeMode":
+                "QtWidgets.QHeaderView.setSectionResizeMode",
+            "sectionsMovable": "QtWidgets.QHeaderView.sectionsMovable",
+            "setSectionsMovable": "QtWidgets.QHeaderView.setSectionsMovable",
+        },
+        "QFileDialog": {
+            "getOpenFileName": "QtWidgets.QFileDialog.getOpenFileName",
+            "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
+            "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
+        },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "QTextEdit": {
+            "setTabStopWidth": "QtWidgets.QTextEdit.setTabStopDistance",
+        },
+        "QTextBrowser": {
+            "setTabStopWidth": "QtWidgets.QTextBrowser.setTabStopDistance",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MouseButton.MiddleButton",
+            "WindowMinMaxButtonsHint": "QtCore.Qt.WindowType.WindowMinMaxButtonsHint",
+        },
+    },
+    "PySide2": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec_",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec_",
+        },
+        "QWidget": {
+            "grab": "QtWidgets.QWidget.grab",
+        },
+        "QHeaderView": {
+            "sectionsClickable": "QtWidgets.QHeaderView.sectionsClickable",
+            "setSectionsClickable":
+                "QtWidgets.QHeaderView.setSectionsClickable",
+            "sectionResizeMode": "QtWidgets.QHeaderView.sectionResizeMode",
+            "setSectionResizeMode":
+                "QtWidgets.QHeaderView.setSectionResizeMode",
+            "sectionsMovable": "QtWidgets.QHeaderView.sectionsMovable",
+            "setSectionsMovable": "QtWidgets.QHeaderView.setSectionsMovable",
+        },
+        "QFileDialog": {
+            "getOpenFileName": "QtWidgets.QFileDialog.getOpenFileName",
+            "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
+            "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
+        },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MiddleButton",
         },
     },
     "PyQt5": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec_",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec_",
+        },
         "QWidget": {
             "grab": "QtWidgets.QWidget.grab",
         },
@@ -1196,8 +1493,21 @@ _compatibility_members = {
             "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
             "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
         },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MiddleButton",
+        },
     },
     "PySide": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec_",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec_",
+        },
         "QWidget": {
             "grab": "QtWidgets.QPixmap.grabWidget",
         },
@@ -1213,9 +1523,22 @@ _compatibility_members = {
             "getOpenFileName": "QtWidgets.QFileDialog.getOpenFileName",
             "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
             "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
+        },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MiddleButton",
         },
     },
     "PyQt4": {
+        "QApplication": {
+            "exec_": "QtWidgets.QApplication.exec_",
+        },
+        "QCoreApplication": {
+            "exec_": "QtCore.QCoreApplication.exec_",
+        },
         "QWidget": {
             "grab": "QtWidgets.QPixmap.grabWidget",
         },
@@ -1231,6 +1554,13 @@ _compatibility_members = {
             "getOpenFileName": "QtWidgets.QFileDialog.getOpenFileName",
             "getOpenFileNames": "QtWidgets.QFileDialog.getOpenFileNames",
             "getSaveFileName": "QtWidgets.QFileDialog.getSaveFileName",
+        },
+        "QFont": {
+            "fromString": "QtGui.QFont.fromString",
+            "setWeight": "QtGui.QFont.setWeight",
+        },
+        "Qt": {
+            "MidButton": "QtCore.Qt.MiddleButton",
         },
     },
 }
@@ -1310,6 +1640,7 @@ def _reassign_misplaced_members(binding):
 
     """
 
+
     for src, dst in _misplaced_members[binding].items():
         dst_value = None
 
@@ -1327,6 +1658,7 @@ def _reassign_misplaced_members(binding):
         dst_member = None
         if len(dst_parts) > 1:
             dst_member = dst_parts[1]
+
 
         # Get the member we want to store in the namesapce.
         if not dst_value:
@@ -1435,6 +1767,138 @@ def _build_compatibility_members(binding, decorators=None):
         setattr(Qt.QtCompat, classname, compat_class)
 
 
+def _pyside6():
+    """Initialise PySide6
+
+    These functions serve to test the existence of a binding
+    along with set it up in such a way that it aligns with
+    the final step; adding members from the original binding
+    to Qt.py
+
+    """
+
+    import PySide6 as module
+    extras = ["QtSvgWidgets", "QtUiTools"]
+    try:
+        import shiboken6
+        extras.append("shiboken6")
+    except ImportError as e:
+        print("ImportError: %s" % e)
+
+    _setup(module, extras)
+    Qt.__binding_version__ = module.__version__
+    Qt.QtCompat.enumValue = _enum_to_value
+
+    if hasattr(Qt, "_shiboken6"):
+        Qt.QtCompat.wrapInstance = _wrapinstance
+        Qt.QtCompat.getCppPointer = _getcpppointer
+        Qt.QtCompat.delete = shiboken6.delete
+
+    if hasattr(Qt, "_QtUiTools"):
+        Qt.QtCompat.loadUi = _loadUi
+
+    if hasattr(Qt, "_QtCore"):
+        Qt.__qt_version__ = Qt._QtCore.qVersion()
+        Qt.QtCompat.dataChanged = (
+            lambda self, topleft, bottomright, roles=None:
+            self.dataChanged.emit(topleft, bottomright, roles or [])
+        )
+
+    if hasattr(Qt, "_QtWidgets"):
+        Qt.QtCompat.setSectionResizeMode = \
+            Qt._QtWidgets.QHeaderView.setSectionResizeMode
+
+    def setWeight(func):
+        def wrapper(self, weight):
+            # PySide6 requires passing Enum data types not int values.
+            weight = _convert_font_weights(weight, 6)
+            return func(self, weight)
+
+        wrapper.__doc__ = func.__doc__
+        wrapper.__name__ = func.__name__
+
+        return wrapper
+
+    decorators = {
+        "QFont": {
+            "setWeight": setWeight,
+        }
+    }
+
+    _reassign_misplaced_members("PySide6")
+    _build_compatibility_members("PySide6", decorators)
+
+    # Patch setTabStopWidth for PySide6 compatibility
+    if hasattr(Qt, "_QtWidgets"):
+        if hasattr(Qt._QtWidgets, "QTextEdit"):
+            Qt._QtWidgets.QTextEdit.setTabStopWidth = Qt._QtWidgets.QTextEdit.setTabStopDistance
+        if hasattr(Qt._QtWidgets, "QTextBrowser"):
+            Qt._QtWidgets.QTextBrowser.setTabStopWidth = Qt._QtWidgets.QTextBrowser.setTabStopDistance
+
+    # Patch QFontMetrics.width for PySide6 compatibility
+    if hasattr(Qt, "_QtGui"):
+        if hasattr(Qt._QtGui, "QFontMetrics"):
+            Qt._QtGui.QFontMetrics.width = Qt._QtGui.QFontMetrics.horizontalAdvance
+
+    # Patch QApplication.desktop for PySide6 compatibility
+    if hasattr(Qt, "_QtWidgets"):
+        class DesktopWrapper:
+            """Wrapper to provide desktop() compatibility for PySide6"""
+            @staticmethod
+            def screenGeometry(point=None):
+                """Get screen geometry for a point or primary screen"""
+                if point is not None:
+                    screen = Qt._QtWidgets.QApplication.screenAt(point)
+                    if screen:
+                        return screen.geometry()
+                # Fallback to primary screen
+                screen = Qt._QtWidgets.QApplication.primaryScreen()
+                if screen:
+                    return screen.geometry()
+                return Qt._QtCore.QRect()
+
+        Qt._QtWidgets.QApplication.desktop = staticmethod(lambda: DesktopWrapper())
+
+    # Add QRegExp compatibility wrapper for PySide6
+    if hasattr(Qt, "_QtCore"):
+        class QRegExpCompat:
+            """Wrapper to provide QRegExp compatibility using QRegularExpression"""
+            def __init__(self, pattern=""):
+                self._pattern = pattern
+                self._regex = Qt._QtCore.QRegularExpression(pattern)
+                self._last_match = None
+                self._last_text = ""
+
+            def indexIn(self, text, offset=0):
+                """Find pattern in text starting at offset, return index or -1"""
+                self._last_text = text
+                self._last_match = self._regex.match(text, offset)
+                if self._last_match.hasMatch():
+                    return self._last_match.capturedStart()
+                return -1
+
+            def matchedLength(self):
+                """Return length of last match"""
+                if self._last_match and self._last_match.hasMatch():
+                    return self._last_match.capturedLength()
+                return 0
+
+            def cap(self, nth=0):
+                """Return nth captured text"""
+                if self._last_match and self._last_match.hasMatch():
+                    return self._last_match.captured(nth)
+                return ""
+
+            def pos(self, nth=0):
+                """Return position of nth capture"""
+                if self._last_match and self._last_match.hasMatch():
+                    return self._last_match.capturedStart(nth)
+                return -1
+
+        Qt.QtCore.QRegExp = QRegExpCompat
+
+
+
 def _pyside2():
     """Initialise PySide2
 
@@ -1460,6 +1924,7 @@ def _pyside2():
 
     _setup(module, extras)
     Qt.__binding_version__ = module.__version__
+    Qt.QtCompat.enumValue = _enum_to_int
 
     if hasattr(Qt, "_shiboken2"):
         Qt.QtCompat.wrapInstance = _wrapinstance
@@ -1480,8 +1945,14 @@ def _pyside2():
         Qt.QtCompat.setSectionResizeMode = \
             Qt._QtWidgets.QHeaderView.setSectionResizeMode
 
+    decorators = {
+        "QFont": {
+            "fromString": _fromStringQt5,
+        },
+    }
+
     _reassign_misplaced_members("PySide2")
-    _build_compatibility_members("PySide2")
+    _build_compatibility_members("PySide2", decorators)
 
 
 def _pyside():
@@ -1502,6 +1973,7 @@ def _pyside():
 
     _setup(module, extras)
     Qt.__binding_version__ = module.__version__
+    Qt.QtCompat.enumValue = _enum_to_int
 
     if hasattr(Qt, "_shiboken"):
         Qt.QtCompat.wrapInstance = _wrapinstance
@@ -1527,8 +1999,50 @@ def _pyside():
             self.dataChanged.emit(topleft, bottomright)
         )
 
+    decorators = {
+        "QFont": {
+            "fromString": _fromStringQt5,
+        },
+    }
+
     _reassign_misplaced_members("PySide")
-    _build_compatibility_members("PySide")
+    _build_compatibility_members("PySide", decorators)
+
+
+def _pyqt6():
+    """Initialise PyQt6"""
+
+    import PyQt6 as module
+    extras = ["QtSvgWidgets", "uic"]
+
+    from PyQt6 import sip
+    extras += ["sip"]
+
+    Qt.QtCompat.enumValue = _enum_to_value
+
+    _setup(module, extras)
+    if hasattr(Qt, "_sip"):
+        Qt.QtCompat.wrapInstance = _wrapinstance
+        Qt.QtCompat.getCppPointer = _getcpppointer
+        Qt.QtCompat.delete = sip.delete
+
+    if hasattr(Qt, "_uic"):
+        Qt.QtCompat.loadUi = _loadUi
+
+    if hasattr(Qt, "_QtCore"):
+        Qt.__binding_version__ = Qt._QtCore.PYQT_VERSION_STR
+        Qt.__qt_version__ = Qt._QtCore.QT_VERSION_STR
+        Qt.QtCompat.dataChanged = (
+            lambda self, topleft, bottomright, roles=None:
+            self.dataChanged.emit(topleft, bottomright, roles or [])
+        )
+
+    if hasattr(Qt, "_QtWidgets"):
+        Qt.QtCompat.setSectionResizeMode = \
+            Qt._QtWidgets.QHeaderView.setSectionResizeMode
+
+    _reassign_misplaced_members("PyQt6")
+    _build_compatibility_members('PyQt6')
 
 
 def _pyqt5():
@@ -1536,6 +2050,8 @@ def _pyqt5():
 
     import PyQt5 as module
     extras = ["uic"]
+
+    Qt.QtCompat.enumValue = _enum_to_int
 
     try:
         # Relevant to PyQt5 5.11 and above
@@ -1570,8 +2086,14 @@ def _pyqt5():
         Qt.QtCompat.setSectionResizeMode = \
             Qt._QtWidgets.QHeaderView.setSectionResizeMode
 
+    decorators = {
+        "QFont": {
+            "fromString": _fromStringQt5,
+        },
+    }
+
     _reassign_misplaced_members("PyQt5")
-    _build_compatibility_members('PyQt5')
+    _build_compatibility_members('PyQt5', decorators)
 
 
 def _pyqt4():
@@ -1618,6 +2140,8 @@ def _pyqt4():
         extras.append(sip.__name__)
     except ImportError:
         sip = None
+
+    Qt.QtCompat.enumValue = _enum_to_int
 
     _setup(module, extras)
     if hasattr(Qt, "_sip"):
@@ -1669,7 +2193,10 @@ def _pyqt4():
             "getOpenFileName": _standardizeQFileDialog,
             "getOpenFileNames": _standardizeQFileDialog,
             "getSaveFileName": _standardizeQFileDialog,
-        }
+        },
+        "QFont": {
+            "fromString": _fromStringQt5,
+        },
     }
     _build_compatibility_members('PyQt4', decorators)
 
@@ -1717,9 +2244,10 @@ def _convert(lines):
     """
 
     def parse(line):
-        line = line.replace("from PySide2 import", "from Qt import QtCompat,")
+        line = line.replace("from PySide2", "from Qt")
         line = line.replace("QtWidgets.QApplication.translate",
                             "QtCompat.translate")
+        line = line.replace("QCoreApplication.translate", "QtCompat.translate")
         if "QtCore.SIGNAL" in line:
             raise NotImplementedError("QtCore.SIGNAL is missing from PyQt5 "
                                       "and so Qt.py does not support it: you "
@@ -1727,10 +2255,18 @@ def _convert(lines):
                                       "your ui files.")
         return line
 
-    parsed = list()
-    for line in lines:
-        line = parse(line)
-        parsed.append(line)
+    parsed = [parse(line) for line in lines]
+    qt_compat_imported = any("from Qt import QtCompat" in line for line in parsed)
+
+    if not qt_compat_imported:
+        try:
+            last_qt_import_line = max(
+                i for i, line in enumerate(parsed) if line.startswith("from Qt"))
+        except ValueError:
+            last_qt_import_line = 0
+        parsed.insert(last_qt_import_line + 1, "from Qt import QtCompat\n")
+
+
 
     return parsed
 
@@ -1784,7 +2320,7 @@ def _cli(args):
         # <------ Write
         #
         with open(args.convert, "w") as f:
-            f.write("".join(lines))
+            f.writelines(lines)
 
         sys.stdout.write("Successfully converted \"%s\"\n" % args.convert)
 
@@ -1821,7 +2357,7 @@ class MissingMember(object):
 
 def _install():
     # Default order (customize order and content via QT_PREFERRED_BINDING)
-    default_order = ("PySide2", "PyQt5", "PySide", "PyQt4")
+    default_order = ("PySide6", "PyQt6", "PySide2", "PyQt5", "PySide", "PyQt4")
     preferred_order = None
     if QT_PREFERRED_BINDING_JSON:
         # A per-vendor preferred binding customization was defined
@@ -1854,6 +2390,8 @@ def _install():
     order = preferred_order or default_order
 
     available = {
+        "PySide6": _pyside6,
+        "PyQt6": _pyqt6,
         "PySide2": _pyside2,
         "PyQt5": _pyqt5,
         "PySide": _pyside,
@@ -1938,6 +2476,8 @@ def _install():
 _install()
 
 # Setup Binding Enum states
+Qt.IsPySide6 = Qt.__binding__ == "PySide6"
+Qt.IsPyQt6 = Qt.__binding__ == "PyQt6"
 Qt.IsPySide2 = Qt.__binding__ == 'PySide2'
 Qt.IsPyQt5 = Qt.__binding__ == 'PyQt5'
 Qt.IsPySide = Qt.__binding__ == 'PySide'

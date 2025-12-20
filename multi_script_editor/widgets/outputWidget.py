@@ -22,7 +22,9 @@ class outputClass(QTextBrowser):
         font.setFixedPitch(True)
         self.setFont(font)
         self.fs = 14
-        self.document().setDefaultFont(QFont(font_name, self.fs, QFont.Monospace))
+        default_font = QFont(font_name, self.fs)
+        default_font.setStyleHint(QFont.Monospace)
+        self.document().setDefaultFont(default_font)
         metrics = QFontMetrics(self.document().defaultFont())
         self.setTabStopWidth(4 * metrics.width(' '))
         self.setMouseTracking(1)

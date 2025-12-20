@@ -19,9 +19,13 @@ ns = main.__dict__
 if not __name__ in ns:
     exec('import {0}'.format(__name__), ns)
 
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+# from PySide2.QtCore import *
+# from PySide2.QtGui import *
+# from PySide2.QtWidgets import *
+
+from vendor.Qt.QtCore import *
+from vendor.Qt.QtWidgets import *
+from vendor.Qt.QtGui import *
 
 import tempfile
 

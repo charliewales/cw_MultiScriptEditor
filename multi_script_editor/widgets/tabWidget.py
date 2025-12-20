@@ -74,6 +74,8 @@ class tabWidgetClass(QTabWidget):
         return text
 
     def addNewTab(self, name='New Tab', text = None):
+        # Ensure name is a string (PySide6 is stricter about types)
+        name = str(name) if name is not None else 'New Tab'
         cont = container(text, self.p, self.desk)
         cont.edit.saveSignal.connect(self.p.saveSession)
         self.addTab(cont, name)
