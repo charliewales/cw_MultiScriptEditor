@@ -6,6 +6,9 @@ from functools import partial
 
 # Set preferred binding
 os.environ["QT_PREFERRED_BINDING"] = os.pathsep.join(["PySide2", "PySide6"])
+# Disable High Dpi Scaling in PySide6
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
+
 
 import managers
 import sessionManager
