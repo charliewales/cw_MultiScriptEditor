@@ -1,4 +1,4 @@
-# Multi Script Editor v4.0.0
+# Multi Script Editor v4.x.x
 <img width="1088" height="1166" alt="image" src="https://github.com/user-attachments/assets/332bb5d8-0f5f-41ee-8590-de80b452d9e0" />
 
 ## [Original code from Paul Winex](https://github.com/paulwinex/pw_MultiScriptEditor)
@@ -88,4 +88,5 @@ Do this for each app.
 # License
 
 This project is licensed under the MIT License
+
 
