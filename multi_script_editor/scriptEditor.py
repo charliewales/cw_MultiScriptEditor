@@ -13,8 +13,8 @@ os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
 import managers
 import sessionManager
 import settingsManager
-from icons import *
 import vendor.Qt
+from icons import *
 from vendor.help import get_help
 from vendor.Qt.QtCore import *
 from vendor.Qt.QtGui import *
@@ -28,9 +28,16 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     def __init__(self, parent=None):
         super(scriptEditorClass, self).__init__(parent)
         # ui
+        ver = "4.1.3"
         py_ver = sys.version.split(' ')[0]
-        self.ver = '4.1.2 · Python-{0} · {1}-{2}'.format(py_ver, vendor.Qt.__binding__, vendor.Qt.__binding_version__)
+        self.ver = '{0} · Python-{1} · {2}-{3}'.format(
+            ver, py_ver, vendor.Qt.__binding__, vendor.Qt.__binding_version__
+        )
         self.setupUi(self)
+        self.icon_path = os.path.dirname(__file__)
+        window_icon = "{0}/icons/pw.png".format(self.icon_path)
+        self.setWindowIcon(QIcon(window_icon))
+
         self.setWindowTitle('Multi Script Editor v%s' % self.ver)
         self.setObjectName('cw_scriptEditor')
         # widgets
@@ -467,6 +474,11 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
                 try:
                     result = eval(command, self.namespace, self.namespace)
                     if result != None:
+                        #if command.startswith("dir("):
+                        #    result = "['" + "',\n'".join(result) + "']"
+                        #    self.out.showMessage(result)
+                        #else:
+                        #    self.out.showMessage(repr(result))
                         self.out.showMessage(repr(result))
                 except SyntaxError:
                     exec(command, self.namespace)
